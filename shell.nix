@@ -9,26 +9,22 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
-		vulkan-headers
-		vulkan-loader
-		vulkan-validation-layers
 		pkg-config
-		shaderc
 		iconv
 		rustc
 		rust-analyzer
 		cargo
-		darwin.apple_sdk.frameworks.AppKit
-		darwin.apple_sdk.frameworks.CoreGraphics
+		darwin.apple_sdk_11_0.frameworks.Foundation
+		darwin.apple_sdk_11_0.frameworks.ImageIO
+		darwin.apple_sdk_11_0.frameworks.AppKit
+		darwin.apple_sdk_11_0.frameworks.Vision
+		darwin.apple_sdk_11_0.frameworks.CoreGraphics
+		darwin.apple_sdk_11_0.frameworks.Metal
+		darwin.apple_sdk_11_0.frameworks.AVFoundation
+		darwin.apple_sdk_11_0.frameworks.CoreMIDI
+		darwin.apple_sdk_11_0.frameworks.MetalKit
 		darwin.libobjc
   ];
-	# reading https://matklad.github.io/2022/03/14/rpath-or-why-lld-doesnt-work-on-nixos.html
-	# makes me thing I shouldn't have to do this, and maybe am calling the wrong thing somewhere.
 	shellHook = ''
-	  export SHADERC_LIB_DIR=${pkgs.shaderc.lib}/lib &&
-		## Not sure I needed this one:
-		## VULKAN_SDK=${pkgs.vulkan-loader} &&
-		export RUSTFLAGS="-C link-arg=-Wl,-rpath,${pkgs.vulkan-loader}/lib" &&
-		export VK_ADD_LAYER_PATH=${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d
 	'';
 }

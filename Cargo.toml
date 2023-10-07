@@ -7,21 +7,8 @@ authors = [
 publish = false
 
 [dependencies]
-# The `vulkano` crate is the main crate that you must use to use Vulkan.
-vulkano = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "d2210470", features = ["serde"] }
-# Provides the `shader!` macro that is used to generate code for using shaders.
-vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "d2210470"}
-# The Vulkan library doesn't provide any functionality to create and handle windows, as
-# this would be out of scope. In order to open a window, we are going to use the `winit` crate.
-winit = "0.28"
-vulkano-util = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "d2210470"}
+miniquad = "0.4.0-alpha.10"
 
-cgmath = "0.18"
-glium = "0.32.1"
-png = "0.17"
-rand = "0.8.4"
-ron = "0.8"
-serde = { version = "1.0", features = ["derive"] }
-
-# Glium has still not been updated to the latest winit version
-winit_glium = { package = "winit", version = "0.27.1" }
+[[bin]]
+name = "tabularasa"
+path = "src/main.rs"
