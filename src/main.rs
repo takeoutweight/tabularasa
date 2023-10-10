@@ -102,7 +102,7 @@ impl EventHandler for Stage {
         self.ctx.apply_pipeline(&self.pipeline);
         self.ctx.apply_bindings(&self.bindings);
         for i in 0..10 {
-            let t = t + i as f64 * 0.1;
+            let t = (t as f64)*0.05 + (i as f64)*0.5;
 
             self.ctx
                 .apply_uniforms(UniformsSource::table(&shader::Uniforms {
@@ -119,10 +119,10 @@ impl EventHandler for Stage {
 fn draw_rect(arr: &mut [u8; 400*200*4], x:usize, y:usize,w:usize,h:usize, color:Color) {
 		for j in 0..h {
 				for i in 0..w {
-						arr[(y+j)*400*4 + (x+i)*4 + 0] = color.r();
-						arr[(y+j)*400*4 + (x+i)*4 + 1] = color.g();
-						arr[(y+j)*400*4 + (x+i)*4 + 2] = color.b();
-						arr[(y+j)*400*4 + (x+i)*4 + 3] = color.a();
+						arr[(y+j)*400*4 + (x+i)*4 + 0] = color.a();
+						arr[(y+j)*400*4 + (x+i)*4 + 1] = color.r();
+						arr[(y+j)*400*4 + (x+i)*4 + 2] = color.g();
+						arr[(y+j)*400*4 + (x+i)*4 + 3] = color.b();
 				}
 		}
 }
@@ -137,12 +137,17 @@ fn main() {
     };
 
 		let mut texture: [u8; 400 * 200 * 4] = [0; 400 * 200 * 4];
+		draw_rect(&mut texture,0,0,400,200,Color(0x50505050));
+		draw_rect(&mut texture,0,0,200,50,Color(0xffff5000));
 		let mut font_system = FontSystem::new();
 		let mut swash_cache = SwashCache::new();
-		let metrics = Metrics::new(14.0, 20.0);
+		let metrics = Metrics::new(14.0*4.0, 20.0*4.0);
 		let mut buffer = Buffer::new(&mut font_system, metrics);
 		let attrs = Attrs::new();
 		let text_color = Color::rgb(0xFF, 0xFF, 0xFF);
+		let width = 80u16;
+    let height = 25u16;
+    buffer.set_size(&mut font_system, 80.0*4.0, 25.0*4.0);
 		buffer.set_text(&mut font_system, " Hi, Rust! 🦀", attrs, Shaping::Advanced);
 		buffer.draw(&mut font_system, &mut swash_cache, text_color, |x,y,w,h,color| {
 				draw_rect(&mut texture,
@@ -151,8 +156,6 @@ fn main() {
  								 usize::try_from(w).unwrap(),
  								 usize::try_from(h).unwrap(),color);
  		});
-		draw_rect(&mut texture,0,0,400,200,Color(0x50505050));
-		draw_rect(&mut texture,0,0,200,50,Color(0xffff5000));
 
     miniquad::start(conf, move || Box::new(Stage::new(texture)));
 }
