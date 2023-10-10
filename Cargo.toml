@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 miniquad = "0.4.0-alpha.10"
+cosmic-text = "0.9.0"
 
 [[bin]]
 name = "tabularasa"
