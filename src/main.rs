@@ -25,10 +25,10 @@ impl Stage {
 
         #[rustfmt::skip]
         let vertices: [Vertex; 4] = [
-            Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 1. } },
-            Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 1. } },
+            Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 1. } },
+            Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 1. } },
+            Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 0. } },
+            Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 0. } },
         ];
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -74,13 +74,34 @@ impl Stage {
             )
             .unwrap();
 
-        let pipeline = ctx.new_pipeline(
+				if ctx.info().backend == Backend::Metal {
+						println!("Backend is metal");
+				}
+				if ctx.info().backend == Backend::OpenGl {
+						println!("Backend is opengl");
+				}
+
+				let params = PipelineParams{
+						color_blend: Some(BlendState::new(
+            Equation::Add,
+            BlendFactor::Value(BlendValue::SourceAlpha),
+            BlendFactor::OneMinusValue(BlendValue::SourceAlpha))
+        ),
+						alpha_blend: Some(BlendState::new(
+            Equation::Add,
+            BlendFactor::Value(BlendValue::SourceAlpha),
+            BlendFactor::OneMinusValue(BlendValue::SourceAlpha)
+        )),
+				..PipelineParams::default()};
+
+        let pipeline = ctx.new_pipeline_with_params(
             &[BufferLayout::default()],
             &[
                 VertexAttribute::new("in_pos", VertexFormat::Float2),
                 VertexAttribute::new("in_uv", VertexFormat::Float2),
             ],
             shader,
+						params,
         );
 
         Stage {
@@ -119,10 +140,10 @@ impl EventHandler for Stage {
 fn draw_rect(arr: &mut [u8; 400*200*4], x:usize, y:usize,w:usize,h:usize, color:Color) {
 		for j in 0..h {
 				for i in 0..w {
-						arr[(y+j)*400*4 + (x+i)*4 + 0] = color.a();
-						arr[(y+j)*400*4 + (x+i)*4 + 1] = color.r();
-						arr[(y+j)*400*4 + (x+i)*4 + 2] = color.g();
-						arr[(y+j)*400*4 + (x+i)*4 + 3] = color.b();
+						arr[((y)+j)*400*4 + (x+i)*4 + 0] = color.r();
+						arr[((y)+j)*400*4 + (x+i)*4 + 1] = color.g();
+						arr[((y)+j)*400*4 + (x+i)*4 + 2] = color.b();
+						arr[((y)+j)*400*4 + (x+i)*4 + 3] = color.a();
 				}
 		}
 }
@@ -137,8 +158,8 @@ fn main() {
     };
 
 		let mut texture: [u8; 400 * 200 * 4] = [0; 400 * 200 * 4];
-		draw_rect(&mut texture,0,0,400,200,Color(0x50505050));
-		draw_rect(&mut texture,0,0,200,50,Color(0xffff5000));
+		draw_rect(&mut texture,0,0,400,200,Color::rgba(0,0xff,0,30));
+		//draw_rect(&mut texture,0,0,200,50,Color(0xffff5000));
 		let mut font_system = FontSystem::new();
 		let mut swash_cache = SwashCache::new();
 		let metrics = Metrics::new(14.0*4.0, 20.0*4.0);
@@ -181,8 +202,13 @@ mod shader {
 
     uniform sampler2D tex;
 
+    precision highp float;
+
     void main() {
-        gl_FragColor = texture2D(tex, texcoord);
+        vec4 texColor = texture2D(tex, texcoord);
+//        if(texColor.a < 0.1)
+//          discard;
+        gl_FragColor = texColor;
     }"#;
 
     pub const METAL: &str = r#"
