@@ -13,6 +13,7 @@ pkgs.mkShell {
 		iconv
 		rustc
 		rust-analyzer
+		rustfmt
 		cargo
 		darwin.apple_sdk_11_0.frameworks.Foundation
 		darwin.apple_sdk_11_0.frameworks.ImageIO
