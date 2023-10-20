@@ -17,10 +17,12 @@ struct Stage {
 
     pipeline: Pipeline,
     bindings: Bindings,
+		window_width: f32,
+		window_height: f32,
 }
 
 impl Stage {
-    pub fn new(bitmap: [u8; 400*200*4]) -> Stage {
+    pub fn new(window_width: f32, window_height:f32, bitmap: [u8; 400*200*4]) -> Stage {
         let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
         #[rustfmt::skip]
@@ -108,6 +110,8 @@ impl Stage {
             pipeline,
             bindings,
             ctx,
+						window_width,
+						window_height,
         }
     }
 }
@@ -135,6 +139,12 @@ impl EventHandler for Stage {
 
         self.ctx.commit_frame();
     }
+
+		fn resize_event(&mut self, w:f32, h:f32) {
+				self.window_width = w;
+				self.window_height = h;
+				println!("Resize: {},{}",w,h);
+		}
 }
 
 fn draw_rect(arr: &mut [u8; 400*200*4], x:usize, y:usize,w:usize,h:usize, color:Color) {
@@ -156,6 +166,7 @@ fn main() {
     } else {
         conf::AppleGfxApi::OpenGl
     };
+		println!("Conf.width {}x{}",conf.window_width, conf.window_height);
 
 		let mut texture: [u8; 400 * 200 * 4] = [0; 400 * 200 * 4];
 		draw_rect(&mut texture,0,0,400,200,Color::rgba(0,0xff,0,30));
@@ -177,8 +188,9 @@ fn main() {
  								 usize::try_from(w).unwrap(),
  								 usize::try_from(h).unwrap(),color);
  		});
-
-    miniquad::start(conf, move || Box::new(Stage::new(texture)));
+    let window_width = conf.window_width as f32;
+		let window_height = conf.window_height as f32;
+    miniquad::start(conf, move || Box::new(Stage::new(window_width, window_height, texture)));
 }
 
 mod shader {
