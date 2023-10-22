@@ -25,12 +25,14 @@ impl Stage {
     pub fn new(window_width: f32, window_height:f32, bitmap: [u8; 400*200*4]) -> Stage {
         let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
+				let bwidth = 200.0;
+				let bheight = 200.0;
         #[rustfmt::skip]
         let vertices: [Vertex; 4] = [
-            Vertex { pos : Vec2 { x: -0.5, y: -0.5 }, uv: Vec2 { x: 0., y: 1. } },
-            Vertex { pos : Vec2 { x:  0.5, y: -0.5 }, uv: Vec2 { x: 1., y: 1. } },
-            Vertex { pos : Vec2 { x:  0.5, y:  0.5 }, uv: Vec2 { x: 1., y: 0. } },
-            Vertex { pos : Vec2 { x: -0.5, y:  0.5 }, uv: Vec2 { x: 0., y: 0. } },
+            Vertex { pos : Vec2 { x: -0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 0., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 1., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 1., y: 1. } },
+            Vertex { pos : Vec2 { x: -0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 0., y: 1. } },
         ];
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -131,7 +133,8 @@ impl EventHandler for Stage {
 
             self.ctx
                 .apply_uniforms(UniformsSource::table(&shader::Uniforms {
-                    offset: (t.sin() as f32 * 0.5, (t * 3.).cos() as f32 * 0.5),
+                    offset: ((t.sin() as f32 * 500.0) + 500.0, ((t * 3.).cos() as f32 * 500.0) + 500.0),
+										window_scale: (1.0/self.window_width.max(0.1), -1.0/self.window_height.max(0.1)),
                 }));
             self.ctx.draw(0, 6, 1);
         }
@@ -143,7 +146,6 @@ impl EventHandler for Stage {
 		fn resize_event(&mut self, w:f32, h:f32) {
 				self.window_width = w;
 				self.window_height = h;
-				println!("Resize: {},{}",w,h);
 		}
 }
 
@@ -201,6 +203,7 @@ mod shader {
     attribute vec2 in_uv;
 
     uniform vec2 offset;
+    uniform vec2 window_scale;
 
     varying lowp vec2 texcoord;
 
@@ -231,6 +234,7 @@ mod shader {
     struct Uniforms
     {
         float2 offset;
+        float2 window_scale;
     };
 
     struct Vertex
@@ -251,7 +255,7 @@ mod shader {
     {
         RasterizerData out;
 
-        out.position = float4(v.in_pos.xy + uniforms.offset, 0.0, 1.0);
+        out.position = float4((uniforms.window_scale * (v.in_pos.xy + uniforms.offset)) + float2(-1.0,1.0), 0.0, 1.0);
         out.uv = v.in_uv;
 
         return out;
@@ -274,5 +278,6 @@ mod shader {
     #[repr(C)]
     pub struct Uniforms {
         pub offset: (f32, f32),
+				pub window_scale:(f32,f32),
     }
 }
