@@ -1,5 +1,11 @@
 use miniquad::*;
 use cosmic_text::{Attrs, AttrsList, Buffer, BufferLine, Color, FontSystem, Metrics, ShapeBuffer, Shaping, SwashCache, Wrap};
+use texture_packer::packer::{Packer, SkylinePacker};
+use texture_packer::rect::Rect;
+use texture_packer::frame::Frame;
+use texture_packer::{TexturePacker, TexturePackerConfig};
+// use texture_packer::importer::
+// use image_importer::ImageImporter;
 
 #[repr(C)]
 struct Vec2 {
@@ -193,11 +199,34 @@ fn main() {
 
     // Fussing with texture atlases
 		let mut shape_buffer = ShapeBuffer::default();
-		let mut buffer_line = BufferLine::new("Buffered Line 🐧", AttrsList::new(attrs), Shaping::Advanced);
+		let mut buffer_line = BufferLine::new("Buffered Line 🐧🐧🐧", AttrsList::new(attrs), Shaping::Advanced);
 		// let shape = buffer_line.shape_in_buffer(&mut shape_buffer, &mut font_system);
 		let layout_lines = buffer_line.layout_in_buffer(&mut shape_buffer,  &mut font_system, 25.0, 500.0, Wrap::None);
-		let glyph_key = layout_lines[0].glyphs[0].physical((0.0,0.0), 1.0).cache_key;
-		let img = swash_cache.get_image(&mut font_system, glyph_key);
+		let glyph_key = layout_lines[0].glyphs[1].physical((0.0,0.0), 1.0).cache_key;
+		let maybe_img = swash_cache.get_image(&mut font_system, glyph_key);
+		let config = TexturePackerConfig {
+          max_width: 1028,
+          max_height: 40000,
+          allow_rotation: false,
+          texture_outlines: true,
+          border_padding: 2,
+          ..Default::default()
+        };
+		let mut packer = SkylinePacker::new(config);
+		if let Some(img) = maybe_img {
+				let width = img.placement.width;
+				let height = img.placement.height;
+
+				let name = "hi";
+				let frame = packer.pack(name, &Rect::new(0,0,width,height));
+				if let Some(frm) = frame {
+						println!("frame {}: {},{}: {}x{}", glyph_key.glyph_id, frm.frame.x
+										 , frm.frame.y, frm.frame.h, frm.frame.h );
+				}
+
+		}
+		// how do I operate over references like this?
+		//let img_w = img.clone().expect("no image").placement.width;
 		// let line = shape.spans[0].words[0].glyphs[0].physical();
 		//swash_cache.get_image(&mut font_system, 
 		
