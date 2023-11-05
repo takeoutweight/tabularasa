@@ -1,5 +1,5 @@
 use miniquad::*;
-use cosmic_text::{Attrs, Buffer, Color, FontSystem, Metrics, Shaping, SwashCache};
+use cosmic_text::{Attrs, AttrsList, Buffer, BufferLine, Color, FontSystem, Metrics, ShapeBuffer, Shaping, SwashCache, Wrap};
 
 #[repr(C)]
 struct Vec2 {
@@ -190,6 +190,18 @@ fn main() {
  								 usize::try_from(w).unwrap(),
  								 usize::try_from(h).unwrap(),color);
  		});
+
+    // Fussing with texture atlases
+		let mut shape_buffer = ShapeBuffer::default();
+		let mut buffer_line = BufferLine::new("Buffered Line 🐧", AttrsList::new(attrs), Shaping::Advanced);
+		// let shape = buffer_line.shape_in_buffer(&mut shape_buffer, &mut font_system);
+		let layout_lines = buffer_line.layout_in_buffer(&mut shape_buffer,  &mut font_system, 25.0, 500.0, Wrap::None);
+		let glyph_key = layout_lines[0].glyphs[0].physical((0.0,0.0), 1.0).cache_key;
+		let img = swash_cache.get_image(&mut font_system, glyph_key);
+		// let line = shape.spans[0].words[0].glyphs[0].physical();
+		//swash_cache.get_image(&mut font_system, 
+		
+		
     let window_width = conf.window_width as f32;
 		let window_height = conf.window_height as f32;
     miniquad::start(conf, move || Box::new(Stage::new(window_width, window_height, texture)));
