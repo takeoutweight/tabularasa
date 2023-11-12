@@ -1,5 +1,5 @@
 use miniquad::*;
-use cosmic_text::{Attrs, AttrsList, Buffer, BufferLine, Color, FontSystem, Metrics, ShapeBuffer, Shaping, SwashCache, CacheKey, Wrap};
+use cosmic_text::{Attrs, AttrsList, Buffer, BufferLine, Color, FontSystem, Metrics, ShapeBuffer, Shaping, SwashCache, CacheKey, SubpixelBin, Wrap};
 use texture_packer::packer::{Packer, SkylinePacker};
 use texture_packer::rect::Rect;
 use texture_packer::frame::Frame;
@@ -218,7 +218,10 @@ fn main() {
 		
 		for line in layout_lines {
 				for glyph in line.glyphs.iter() {
-						let glyph_key = glyph.physical((0.0,0.0), 1.0).cache_key;
+						let glyph_key = CacheKey {
+								x_bin: SubpixelBin::Zero,
+								y_bin: SubpixelBin::Zero,
+     						..glyph.physical((0.0,0.0), 1.0).cache_key};
 						let maybe_img = swash_cache.get_image(&mut font_system, glyph_key);
 
 					  if let Some(img) = maybe_img {
