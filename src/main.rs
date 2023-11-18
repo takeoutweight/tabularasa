@@ -31,18 +31,32 @@ struct Stage {
 		window_height: f32,
 }
 
+const ATLAS_WIDTH: u32 = 1028;
+
 impl Stage {
-    pub fn new(window_width: f32, window_height:f32, bitmap: [u8; 400*200*4]) -> Stage {
+    pub fn new(window_width: f32, window_height:f32, bitmap: [u8; 400*200*4], atlas_bitmap: Vec<u8>) -> Stage {
         let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
 				let bwidth = 200.0;
 				let bheight = 200.0;
         #[rustfmt::skip]
-        let vertices: [Vertex; 4] = [
+
+				// for buffer text
+				/*let vertices: [Vertex; 4] = [
             Vertex { pos : Vec2 { x: -0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 0., y: 0. } },
             Vertex { pos : Vec2 { x:  0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 1., y: 0. } },
             Vertex { pos : Vec2 { x:  0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 1., y: 1. } },
             Vertex { pos : Vec2 { x: -0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 0., y: 1. } },
+    ];*/
+				// for showing the atlas
+				let a_height_u = u16::try_from(u32::try_from(atlas_bitmap.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
+				let aheight = a_height_u as f32;
+				let awidth = ATLAS_WIDTH as f32;
+				let vertices: [Vertex; 4] = [
+            Vertex { pos : Vec2 { x: -0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 0., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 1., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 1., y: 1. } },
+            Vertex { pos : Vec2 { x: -0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 0., y: 1. } },
         ];
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -65,7 +79,9 @@ impl Stage {
             0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         ];
         // let texture = ctx.new_texture_from_rgba8(4, 4, &pixels);
-				let texture = ctx.new_texture_from_rgba8(400, 200, &bitmap);
+				// for the hello rust buffer
+				//let texture = ctx.new_texture_from_rgba8(400, 200, &bitmap);
+				let texture = ctx.new_texture_from_rgba8(u16::try_from(ATLAS_WIDTH).unwrap(), a_height_u, &atlas_bitmap);
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
@@ -250,7 +266,7 @@ fn main() {
 		let atlas_height = packer.skylines.iter().fold(0, {|h, skyline| max(h, skyline.y)});
 		println!("max_height: {}", atlas_height);
 
-		let mut atlas_texture = vec![0x0_u8; 1028 * usize::try_from(atlas_height).unwrap() * 4];
+		let mut atlas_texture = vec![0x0_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
 		for (glyph_key, rect) in &glyph_loc {
 				let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
 				if let Some(img)= maybe_img {
@@ -263,7 +279,7 @@ fn main() {
 													"unexpected img size: {} x {} x {:?} vs {}", w, h, img.content, len);
 									for y in 0..h {
 											for x in 0..w {
-													let target = usize::try_from(y*1028*4+x*4).unwrap();
+													let target = usize::try_from(y*ATLAS_WIDTH*4+x*4).unwrap();
 													atlas_texture[target + 0] = 0xff; // r
 													atlas_texture[target + 1] = 0xff;
 													atlas_texture[target + 2] = 0xff;
@@ -278,10 +294,10 @@ fn main() {
 										for y in 0..h {
 												for x in 0..w {
 														for c in 0..4 {
-																let target = usize::try_from(y*1028*4+x*c).unwrap();
+																let target = usize::try_from(y*ATLAS_WIDTH*4+x*c).unwrap();
       													let source = usize::try_from(y*w+x*4+c).unwrap();
 			      										atlas_texture[target] = img.data[source];
-			      										}
+			      								}
 											}
 							   	}
 								},
@@ -298,7 +314,7 @@ fn main() {
 		
     let window_width = conf.window_width as f32;
 		let window_height = conf.window_height as f32;
-    miniquad::start(conf, move || Box::new(Stage::new(window_width, window_height, texture)));
+    miniquad::start(conf, move || Box::new(Stage::new(window_width, window_height, texture, atlas_texture)));
 }
 
 mod shader {
