@@ -1,3 +1,4 @@
+use cosmic_text::rustybuzz::ttf_parser::vorg::VerticalOriginMetrics;
 use miniquad::*;
 use cosmic_text::{Attrs, AttrsList, Buffer, BufferLine, Color, FontSystem, Metrics, ShapeBuffer, Shaping, SwashCache, CacheKey, SubpixelBin, Wrap};
 use texture_packer::packer::{Packer, SkylinePacker};
@@ -7,7 +8,9 @@ use texture_packer::{TexturePacker, TexturePackerConfig};
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
 use std::collections::HashMap;
-
+use std::cmp::max;
+use swash::scale::image::Content;
+		
 #[repr(C)]
 struct Vec2 {
     x: f32,
@@ -215,7 +218,8 @@ fn main() {
         };
 		let mut packer = SkylinePacker::new(config);
 		let mut glyph_loc: HashMap<CacheKey, Rect> = HashMap::new();
-		
+
+		// generate atlas locations (no raster yet)
 		for line in layout_lines {
 				for glyph in line.glyphs.iter() {
 						let glyph_key = CacheKey {
@@ -243,7 +247,48 @@ fn main() {
       		}
 				}
 		}
+		let atlas_height = packer.skylines.iter().fold(0, {|h, skyline| max(h, skyline.y)});
+		println!("max_height: {}", atlas_height);
 
+		let mut atlas_texture = vec![0x0_u8; 1028 * usize::try_from(atlas_height).unwrap() * 4];
+		for (glyph_key, rect) in &glyph_loc {
+				let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
+				if let Some(img)= maybe_img {
+						let w = img.placement.width;
+						let h = img.placement.height;
+						let len = img.data.len();
+						match img.content {
+								Content::Mask => {
+									assert!(usize::try_from(w * h).unwrap() == len,
+													"unexpected img size: {} x {} x {:?} vs {}", w, h, img.content, len);
+									for y in 0..h {
+											for x in 0..w {
+													let target = usize::try_from(y*1028*4+x*4).unwrap();
+													atlas_texture[target + 0] = 0xff; // r
+													atlas_texture[target + 1] = 0xff;
+													atlas_texture[target + 2] = 0xff;
+													atlas_texture[target + 3] // a
+															= img.data[usize::try_from(y*w+x).unwrap()];
+											}
+							   	}
+								},
+								Content::Color => {
+										assert!(usize::try_from(w * h * 4).unwrap() == len,
+													"unexpected img size: {} x {} x {:?} vs {}", w, h, img.content, len);
+										for y in 0..h {
+												for x in 0..w {
+														for c in 0..4 {
+																let target = usize::try_from(y*1028*4+x*c).unwrap();
+      													let source = usize::try_from(y*w+x*4+c).unwrap();
+			      										atlas_texture[target] = img.data[source];
+			      										}
+											}
+							   	}
+								},
+								x => println!("unknown content {:?}", x)
+						}
+				}
+		}
 
 		// how do I operate over references like this?
 		//let img_w = img.clone().expect("no image").placement.width;

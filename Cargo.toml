@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 miniquad = "0.4.0-alpha.10"
+swash = "0.1.8"
 cosmic-text = "0.10.0"
 texture_packer = { path = "../../rust/texture_packer"} # "0.25.0"
 
