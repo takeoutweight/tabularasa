@@ -81,24 +81,36 @@ impl Stage {
         // showing the text using the atlas:
         let mut vertices: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u16> = Vec::new();
+				/*
+				if let Some(line) = buffer_line.shape_opt() {
+						for span in line.spans {
+								for word in span.words {
+										for glyph in word.glyphs {
+										}
+								}
+						}
+				}*/
         if let Some(lines) = buffer_line.layout_opt() {
             for line in lines {
                 for glyph in line.glyphs.iter() {
                     // todo abstract
+										let real_key = glyph.physical((0.0, 0.0), 1.0).cache_key;
                     let glyph_key = CacheKey {
                         x_bin: SubpixelBin::Zero,
                         y_bin: SubpixelBin::Zero,
-                        ..glyph.physical((0.0, 0.0), 1.0).cache_key
+                        ..real_key
                     };
                     // This is using the atlas for width, but if I scale it that won't always be true.
                     // just because there's no "height" for glyphs and I'm not sure why.
                     if let Some(rect) = glyph_loc.get(&glyph_key) {
                         let pre_length = vertices.len() as u16;
-                        let vx = glyph.x as f32;
-                        let vy = glyph.y as f32;
-                        let vw = glyph.w as f32; //using rect.w makes the characters look right but spaced wrong.
+												// just taking stabs in the dark. This is clearly not right.
+												//  - (real_key.x_bin.as_float() * -1.0)
+                        let vx = glyph.x; //glyph.physical((0.0, 0.0), 1.0).x as f32;
+                        let vy = glyph.y; // glyph.physical((0.0, 0.0), 1.0).y as f32;
+                        let vw = rect.w as f32; // glyph.w; //using rect.w makes the characters look right but spaced wrong.
                         let vh = rect.h as f32;
-                        let tx = rect.x as f32 / a_w;
+                        let tx = (rect.x as f32) / a_w;
                         let ty = rect.y as f32 / a_h;
                         let tw = rect.w as f32 / a_w;
                         let th = rect.h as f32 / a_h;
@@ -126,7 +138,8 @@ impl Stage {
                         });
 
                         [0, 1, 2, 0, 2, 3].map(|i| indices.push(pre_length + i));
-                        println!("Adding quad: {:?}", (vx, vy, vw, vh, tx, ty, tw, th));
+                        // println!("Adding quad: {:?}", (vx, vy, vw, vh, tx, real_key.x_bin.as_float(), ty, tw, th));
+												println!("adding quad: {:?}", glyph);
                     }
                 }
             }
@@ -296,7 +309,7 @@ fn main() {
     let width = 80u16;
     let height = 25u16;
     buffer.set_size(&mut font_system, 80.0 * 4.0, 25.0 * 4.0);
-    buffer.set_text(&mut font_system, " Hi, Rust! 🦀", attrs, Shaping::Advanced);
+    buffer.set_text(&mut font_system, " Heya, Rust! 🦀", attrs, Shaping::Advanced);
     buffer.draw(
         &mut font_system,
         &mut swash_cache,
@@ -318,11 +331,12 @@ fn main() {
 		let mut bl_attrs = Attrs::new();
 		let bl_font_size = 72.0;
     let mut buffer_line = BufferLine::new(
-        "Buffered Line 🐧🐧🐧",
+        "my go Buffered Line 🐧🐧🐧 Why is this fricked up?",
         AttrsList::new(bl_attrs),
         Shaping::Advanced,
     );
     // let shape = buffer_line.shape_in_buffer(&mut shape_buffer, &mut font_system);
+		// buffer_line.reset_layout(); doesn't do anything
     let layout_lines =
         buffer_line.layout_in_buffer(&mut shape_buffer, &mut font_system, bl_font_size, 500.0, Wrap::None);
     // let glyph_key = layout_lines[0].glyphs[1].physical((0.0,0.0), 1.0).cache_key;
