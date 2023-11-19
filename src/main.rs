@@ -28,6 +28,7 @@ struct Vertex {
 struct Stage {
     ctx: Box<dyn RenderingBackend>,
 
+    index_count: i32,
     pipeline: Pipeline,
     bindings: Bindings,
     window_width: f32,
@@ -102,25 +103,25 @@ impl Stage {
                         let tw = rect.w as f32 / a_w;
                         let th = rect.h as f32 / a_h;
                         vertices.push(Vertex {
-                            pos: Vec2 { x: vx, y: vy },
+                            pos: Vec2 { x: vx, y: vy - vh },
                             uv: Vec2 { x: tx, y: ty },
-                        });
-                        vertices.push(Vertex {
-                            pos: Vec2 { x: vx + vw, y: vy },
-                            uv: Vec2 { x: tx + tw, y: ty },
                         });
                         vertices.push(Vertex {
                             pos: Vec2 {
                                 x: vx + vw,
-                                y: vy + vh,
+                                y: vy - vh,
                             },
+                            uv: Vec2 { x: tx + tw, y: ty },
+                        });
+                        vertices.push(Vertex {
+                            pos: Vec2 { x: vx + vw, y: vy },
                             uv: Vec2 {
                                 x: tx + tw,
                                 y: ty + th,
                             },
                         });
                         vertices.push(Vertex {
-                            pos: Vec2 { x: vx, y: vy + vh },
+                            pos: Vec2 { x: vx, y: vy },
                             uv: Vec2 { x: tx, y: ty + th },
                         });
 
@@ -139,6 +140,7 @@ impl Stage {
 
         // for one quad
         //let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
+        let index_count = i32::try_from(indices.len()).unwrap();
         let index_buffer = ctx.new_buffer(
             BufferType::IndexBuffer,
             BufferUsage::Immutable,
@@ -214,9 +216,10 @@ impl Stage {
         );
 
         Stage {
+            ctx,
+            index_count,
             pipeline,
             bindings,
-            ctx,
             window_width,
             window_height,
         }
@@ -247,7 +250,7 @@ impl EventHandler for Stage {
                         -1.0 / self.window_height.max(0.1),
                     ),
                 }));
-            self.ctx.draw(0, 17 * 6, 1);
+            self.ctx.draw(0, self.index_count, 1);
         }
         self.ctx.end_render_pass();
 
