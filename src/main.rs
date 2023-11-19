@@ -44,7 +44,7 @@ impl Stage {
         window_height: f32,
         bitmap: [u8; 400 * 200 * 4],
         atlas_bitmap: Vec<u8>,
-        glyph_loc: HashMap<CacheKey, Rect>,
+        glyph_loc: HashMap<CacheKey, (Rect, i32, i32)>,
         buffer_line: BufferLine,
     ) -> Stage {
         let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
@@ -89,7 +89,19 @@ impl Stage {
 										}
 								}
 						}
-				}*/
+		}*/
+				
+        //one quad
+				/*
+				[(0.,0.),(1.,0.),(1.,1.),(0.,1.)].map(|(x,y)| {
+						            vertices.push(Vertex {
+                            pos: Vec2 { x: x*bwidth, y: y*bheight },
+                            uv: Vec2 { x: x, y: y },
+                        });
+				});
+				[0, 1, 2, 0, 2, 3].map(|i| indices.push(0 + i));
+				*/
+
         if let Some(lines) = buffer_line.layout_opt() {
             for line in lines {
                 for glyph in line.glyphs.iter() {
@@ -102,12 +114,12 @@ impl Stage {
                     };
                     // This is using the atlas for width, but if I scale it that won't always be true.
                     // just because there's no "height" for glyphs and I'm not sure why.
-                    if let Some(rect) = glyph_loc.get(&glyph_key) {
+                    if let Some((rect, left, top)) = glyph_loc.get(&glyph_key) {
                         let pre_length = vertices.len() as u16;
 												// just taking stabs in the dark. This is clearly not right.
 												//  - (real_key.x_bin.as_float() * -1.0)
-                        let vx = glyph.x; //glyph.physical((0.0, 0.0), 1.0).x as f32;
-                        let vy = glyph.y; // glyph.physical((0.0, 0.0), 1.0).y as f32;
+                        let vx = glyph.x + (*left as f32); //glyph.physical((0.0, 0.0), 1.0).x as f32;
+                        let vy = (glyph.y as f32) + (rect.h as f32) - (*top as f32); // glyph.physical((0.0, 0.0), 1.0).y as f32;
                         let vw = rect.w as f32; // glyph.w; //using rect.w makes the characters look right but spaced wrong.
                         let vh = rect.h as f32;
                         let tx = (rect.x as f32) / a_w;
@@ -325,13 +337,21 @@ fn main() {
             );
         },
     );
+		for mut bline in buffer.lines {
+				let layout = bline.layout(&mut font_system, 14.0 * 4.0, 80.0 * 4.0, Wrap::None);
+				for line in layout {
+						for glyph in line.glyphs.iter() {
+								println!["bline glyph: {:?}", glyph];
+						}
+				}
+		}
 
     // Fussing with texture atlases
     let mut shape_buffer = ShapeBuffer::default();
 		let mut bl_attrs = Attrs::new();
 		let bl_font_size = 72.0;
     let mut buffer_line = BufferLine::new(
-        "my go Buffered Line 🐧🐧🐧 Why is this fricked up?",
+        "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
         AttrsList::new(bl_attrs),
         Shaping::Advanced,
     );
@@ -350,7 +370,7 @@ fn main() {
         ..Default::default()
     };
     let mut packer = SkylinePacker::new(config);
-    let mut glyph_loc: HashMap<CacheKey, Rect> = HashMap::new();
+    let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32 )> = HashMap::new();
 
     // generate atlas locations (no raster yet)
     for line in layout_lines {
@@ -360,7 +380,7 @@ fn main() {
                 y_bin: SubpixelBin::Zero,
                 ..glyph.physical((0.0, 0.0), 1.0).cache_key
             };
-            if let Some(rect) = glyph_loc.get(&glyph_key) {
+            if let Some((rect, left, top)) = glyph_loc.get(&glyph_key) {
                 println!(
                     "cached: {:?}: {},{}: {}x{}",
                     glyph_key, rect.x, rect.y, rect.w, rect.h
@@ -375,7 +395,7 @@ fn main() {
                     let name = "hi";
                     let frame = packer.pack(name, &Rect::new(0, 0, width, height));
                     if let Some(frm) = frame {
-                        glyph_loc.insert(glyph_key, frm.frame);
+                        glyph_loc.insert(glyph_key, (frm.frame, img.placement.left, img.placement.top));
                         println!(
                             "new:    {:?}: {},{}: {}x{}",
                             glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
@@ -392,9 +412,10 @@ fn main() {
     println!("max_height: {}", atlas_height);
 
     let mut atlas_texture = vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
-    for (glyph_key, rect) in &glyph_loc {
+    for (glyph_key, (rect, left, top)) in &glyph_loc {
         let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
         if let Some(img) = maybe_img {
+						println!["img: {:?}", img.placement];
             let w = img.placement.width;
             let h = img.placement.height;
             let len = img.data.len();
