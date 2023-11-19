@@ -60,36 +60,13 @@ impl Stage {
 				let a_height_u = u16::try_from(u32::try_from(atlas_bitmap.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
         let aheight = a_height_u as f32 * 3.0;
         let awidth = ATLAS_WIDTH as f32 * 3.0;
-        let vertices: [Vertex; 4] = [
-            Vertex {
-                pos: Vec2 {
-                    x: -0.5 * awidth,
-                    y: -0.5 * aheight,
-                },
-                uv: Vec2 { x: 0., y: 0. },
-            },
-            Vertex {
-                pos: Vec2 {
-                    x: 0.5 * awidth,
-                    y: -0.5 * aheight,
-                },
-                uv: Vec2 { x: 1., y: 0. },
-            },
-            Vertex {
-                pos: Vec2 {
-                    x: 0.5 * awidth,
-                    y: 0.5 * aheight,
-                },
-                uv: Vec2 { x: 1., y: 1. },
-            },
-            Vertex {
-                pos: Vec2 {
-                    x: -0.5 * awidth,
-                    y: 0.5 * aheight,
-                },
-                uv: Vec2 { x: 0., y: 1. },
-            },
-        ];
+        #[rustfmt::skip]
+				let vertices: [Vertex; 4] = [
+            Vertex { pos : Vec2 { x: -0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 0., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 1., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 1., y: 1. } },
+            Vertex { pos : Vec2 { x: -0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 0., y: 1. } },];
+
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Immutable,
