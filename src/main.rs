@@ -34,6 +34,7 @@ struct Stage {
     window_height: f32,
 }
 
+// in texels I.e. not bit array u8 length.
 const ATLAS_WIDTH: u32 = 100;
 
 impl Stage {
@@ -42,6 +43,8 @@ impl Stage {
         window_height: f32,
         bitmap: [u8; 400 * 200 * 4],
         atlas_bitmap: Vec<u8>,
+        glyph_loc: HashMap<CacheKey, Rect>,
+        buffer_line: BufferLine,
     ) -> Stage {
         let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
@@ -56,16 +59,77 @@ impl Stage {
             Vertex { pos : Vec2 { x:  0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 1., y: 1. } },
             Vertex { pos : Vec2 { x: -0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 0., y: 1. } },
     ];*/
-				// for showing the atlas
+
 				let a_height_u = u16::try_from(u32::try_from(atlas_bitmap.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
+
+        // for showing the atlas
+        /*
         let aheight = a_height_u as f32 * 3.0;
         let awidth = ATLAS_WIDTH as f32 * 3.0;
+
         #[rustfmt::skip]
-				let vertices: [Vertex; 4] = [
+                let vertices: [Vertex; 4] = [
             Vertex { pos : Vec2 { x: -0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 0., y: 0. } },
             Vertex { pos : Vec2 { x:  0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 1., y: 0. } },
             Vertex { pos : Vec2 { x:  0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 1., y: 1. } },
             Vertex { pos : Vec2 { x: -0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 0., y: 1. } },];
+                 */
+
+        let a_w = ATLAS_WIDTH as f32;
+        let a_h = a_height_u as f32;
+        // showing the text using the atlas:
+        let mut vertices: Vec<Vertex> = Vec::new();
+        let mut indices: Vec<u16> = Vec::new();
+        if let Some(lines) = buffer_line.layout_opt() {
+            for line in lines {
+                for glyph in line.glyphs.iter() {
+                    // todo abstract
+                    let glyph_key = CacheKey {
+                        x_bin: SubpixelBin::Zero,
+                        y_bin: SubpixelBin::Zero,
+                        ..glyph.physical((0.0, 0.0), 1.0).cache_key
+                    };
+                    // This is using the atlas for width, but if I scale it that won't always be true.
+                    // just because there's no "height" for glyphs and I'm not sure why.
+                    if let Some(rect) = glyph_loc.get(&glyph_key) {
+                        let pre_length = vertices.len() as u16;
+                        let vx = glyph.x as f32;
+                        let vy = glyph.y as f32;
+                        let vw = rect.w as f32;
+                        let vh = rect.h as f32;
+                        let tx = rect.x as f32 / a_w;
+                        let ty = rect.y as f32 / a_h;
+                        let tw = rect.w as f32 / a_w;
+                        let th = rect.h as f32 / a_h;
+                        vertices.push(Vertex {
+                            pos: Vec2 { x: vx, y: vy },
+                            uv: Vec2 { x: tx, y: ty },
+                        });
+                        vertices.push(Vertex {
+                            pos: Vec2 { x: vx + vw, y: vy },
+                            uv: Vec2 { x: tx + tw, y: ty },
+                        });
+                        vertices.push(Vertex {
+                            pos: Vec2 {
+                                x: vx + vw,
+                                y: vy + vh,
+                            },
+                            uv: Vec2 {
+                                x: tx + tw,
+                                y: ty + th,
+                            },
+                        });
+                        vertices.push(Vertex {
+                            pos: Vec2 { x: vx, y: vy + vh },
+                            uv: Vec2 { x: tx, y: ty + th },
+                        });
+
+                        [0, 1, 2, 0, 2, 3].map(|i| indices.push(pre_length + i));
+                        println!("Adding quad: {:?}", (vx, vy, vw, vh, tx, ty, tw, th));
+                    }
+                }
+            }
+        }
 
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
@@ -73,7 +137,8 @@ impl Stage {
             BufferSource::slice(&vertices),
         );
 
-        let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
+        // for one quad
+        //let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
         let index_buffer = ctx.new_buffer(
             BufferType::IndexBuffer,
             BufferUsage::Immutable,
@@ -182,7 +247,7 @@ impl EventHandler for Stage {
                         -1.0 / self.window_height.max(0.1),
                     ),
                 }));
-            self.ctx.draw(0, 6, 1);
+            self.ctx.draw(0, 17 * 6, 1);
         }
         self.ctx.end_render_pass();
 
@@ -379,6 +444,8 @@ fn main() {
             window_height,
             texture,
             atlas_texture,
+            glyph_loc,
+            buffer_line,
         ))
     });
 }
