@@ -96,7 +96,7 @@ impl Stage {
                         let pre_length = vertices.len() as u16;
                         let vx = glyph.x as f32;
                         let vy = glyph.y as f32;
-                        let vw = rect.w as f32;
+                        let vw = glyph.w as f32; //using rect.w makes the characters look right but spaced wrong.
                         let vh = rect.h as f32;
                         let tx = rect.x as f32 / a_w;
                         let ty = rect.y as f32 / a_h;
@@ -315,14 +315,16 @@ fn main() {
 
     // Fussing with texture atlases
     let mut shape_buffer = ShapeBuffer::default();
+		let mut bl_attrs = Attrs::new();
+		let bl_font_size = 72.0;
     let mut buffer_line = BufferLine::new(
         "Buffered Line 🐧🐧🐧",
-        AttrsList::new(attrs),
+        AttrsList::new(bl_attrs),
         Shaping::Advanced,
     );
     // let shape = buffer_line.shape_in_buffer(&mut shape_buffer, &mut font_system);
     let layout_lines =
-        buffer_line.layout_in_buffer(&mut shape_buffer, &mut font_system, 25.0, 500.0, Wrap::None);
+        buffer_line.layout_in_buffer(&mut shape_buffer, &mut font_system, bl_font_size, 500.0, Wrap::None);
     // let glyph_key = layout_lines[0].glyphs[1].physical((0.0,0.0), 1.0).cache_key;
 
     let config = TexturePackerConfig {
