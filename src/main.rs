@@ -304,7 +304,7 @@ fn main() {
     let atlas_height = packer
         .skylines
         .iter()
-        .fold(0, { |h, skyline| max(h, skyline.y) });
+        .fold(0, |h, skyline| max(h, skyline.y));
     println!("max_height: {}", atlas_height);
 
     let mut atlas_texture = vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
