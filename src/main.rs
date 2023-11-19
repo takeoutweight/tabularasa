@@ -277,9 +277,12 @@ fn main() {
 								Content::Mask => {
 									assert!(usize::try_from(w * h).unwrap() == len,
 													"unexpected img size: {} x {} x {:?} vs {}", w, h, img.content, len);
+									println!("drawing {:?}",(rect, w,h));
 									for y in 0..h {
 											for x in 0..w {
-													let target = usize::try_from(y*ATLAS_WIDTH*4+x*4).unwrap();
+													let target = usize::try_from((rect.y + y)
+																											  *ATLAS_WIDTH*4
+																											 +((rect.x + x)*4)).unwrap();
 													atlas_texture[target + 0] = 0xff; // r
 													atlas_texture[target + 1] = 0xff;
 													atlas_texture[target + 2] = 0xff;
@@ -294,7 +297,7 @@ fn main() {
 										for y in 0..h {
 												for x in 0..w {
 														for c in 0..4 {
-																let target = usize::try_from(y*ATLAS_WIDTH*4+x*c).unwrap();
+																let target = usize::try_from((rect.y + y)*ATLAS_WIDTH*4+(rect.x + x)*c).unwrap();
       													let source = usize::try_from(y*w+x*4+c).unwrap();
 			      										atlas_texture[target] = img.data[source];
 			      								}
