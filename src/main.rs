@@ -31,7 +31,7 @@ struct Stage {
 		window_height: f32,
 }
 
-const ATLAS_WIDTH: u32 = 1028;
+const ATLAS_WIDTH: u32 = 100;
 
 impl Stage {
     pub fn new(window_width: f32, window_height:f32, bitmap: [u8; 400*200*4], atlas_bitmap: Vec<u8>) -> Stage {
@@ -50,8 +50,8 @@ impl Stage {
     ];*/
 				// for showing the atlas
 				let a_height_u = u16::try_from(u32::try_from(atlas_bitmap.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
-				let aheight = a_height_u as f32;
-				let awidth = ATLAS_WIDTH as f32;
+				let aheight = a_height_u as f32 * 3.0;
+				let awidth = ATLAS_WIDTH as f32 * 3.0;
 				let vertices: [Vertex; 4] = [
             Vertex { pos : Vec2 { x: -0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 0., y: 0. } },
             Vertex { pos : Vec2 { x:  0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 1., y: 0. } },
@@ -225,7 +225,7 @@ fn main() {
 		// let glyph_key = layout_lines[0].glyphs[1].physical((0.0,0.0), 1.0).cache_key;
 
 		let config = TexturePackerConfig {
-          max_width: 1028,
+          max_width: ATLAS_WIDTH,
           max_height: 40000,
           allow_rotation: false,
           texture_outlines: true,
@@ -242,31 +242,30 @@ fn main() {
 								x_bin: SubpixelBin::Zero,
 								y_bin: SubpixelBin::Zero,
      						..glyph.physical((0.0,0.0), 1.0).cache_key};
-						let maybe_img = swash_cache.get_image(&mut font_system, glyph_key);
+						if let Some(rect) = glyph_loc.get(&glyph_key) {
+						  println!("cached: {:?}: {},{}: {}x{}", glyph_key, rect.x, rect.y, rect.w, rect.h );
+						} else {
+						 let maybe_img = swash_cache.get_image(&mut font_system, glyph_key);
 
-					  if let Some(img) = maybe_img {
+					   if let Some(img) = maybe_img {
       				let width = img.placement.width;
       				let height = img.placement.height;
-      
+
       				let name = "hi";
       				let frame = packer.pack(name, &Rect::new(0,0,width,height));
       				if let Some(frm) = frame {
-									if let Some(rect) = glyph_loc.get(&glyph_key) {
-											println!("cached {:?}: {},{}: {}x{}", glyph_key, rect.x
-      										 , rect.y, rect.h, rect.h );
-									} else {
       						  glyph_loc.insert(glyph_key, frm.frame);
-      					  	println!("new    {:?}: {},{}: {}x{}", glyph_key, frm.frame.x
-      										 , frm.frame.y, frm.frame.h, frm.frame.h );
-									}
-      				}
+      					  	println!("new:    {:?}: {},{}: {}x{}", glyph_key, frm.frame.x
+      										 , frm.frame.y, frm.frame.w, frm.frame.h );
+							}
+						}
       		}
 				}
 		}
 		let atlas_height = packer.skylines.iter().fold(0, {|h, skyline| max(h, skyline.y)});
 		println!("max_height: {}", atlas_height);
 
-		let mut atlas_texture = vec![0x0_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
+		let mut atlas_texture = vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
 		for (glyph_key, rect) in &glyph_loc {
 				let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
 				if let Some(img)= maybe_img {
@@ -293,12 +292,12 @@ fn main() {
 								},
 								Content::Color => {
 										assert!(usize::try_from(w * h * 4).unwrap() == len,
-													"unexpected img size: {} x {} x {:?} vs {}", w, h, img.content, len);
+														"unexpected img size: {} x {} x {:?} vs {}", w, h, img.content, len);
 										for y in 0..h {
 												for x in 0..w {
 														for c in 0..4 {
-																let target = usize::try_from((rect.y + y)*ATLAS_WIDTH*4+(rect.x + x)*c).unwrap();
-      													let source = usize::try_from(y*w+x*4+c).unwrap();
+																let target = usize::try_from((rect.y + y)*ATLAS_WIDTH*4+(rect.x + x)*4 + c).unwrap();
+      													let source = usize::try_from(y*w*4+x*4+c).unwrap();
 			      										atlas_texture[target] = img.data[source];
 			      								}
 											}
