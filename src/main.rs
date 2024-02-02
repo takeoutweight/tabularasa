@@ -316,6 +316,7 @@ fn main() {
     } else {
         conf::AppleGfxApi::OpenGl
     };
+		conf.high_dpi = true;
     println!("Conf.width {}x{}", conf.window_width, conf.window_height);
 
     let mut texture: [u8; 400 * 200 * 4] = [0; 400 * 200 * 4];
@@ -498,8 +499,8 @@ fn main() {
     // let line = shape.spans[0].words[0].glyphs[0].physical();
     //swash_cache.get_image(&mut font_system,
 
-    let window_width = conf.window_width as f32;
-    let window_height = conf.window_height as f32;
+    let window_width = conf.window_width as f32 * 2.0; // not sure we can get dpi_scale before starting
+    let window_height = conf.window_height as f32 * 2.0;
     miniquad::start(conf, move || {
         Box::new(Stage::new(
             window_width,
