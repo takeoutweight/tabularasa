@@ -33,6 +33,7 @@ struct Stage {
     bindings: Bindings,
     window_width: f32,
     window_height: f32,
+		draws_remaining: i32,
 }
 
 // in texels I.e. not bit array u8 length.
@@ -240,6 +241,8 @@ impl Stage {
             params,
         );
 
+				let draws_remaining = 600;
+
         Stage {
             ctx,
             index_count,
@@ -247,6 +250,7 @@ impl Stage {
             bindings,
             window_width,
             window_height,
+						draws_remaining,
         }
     }
 }
@@ -255,6 +259,10 @@ impl EventHandler for Stage {
     fn update(&mut self) {}
 
     fn draw(&mut self) {
+				if (self.draws_remaining > 0) {
+
+						// self.draws_remaining -= 1;
+
         let t = date::now();
 
         self.ctx.begin_default_pass(Default::default());
@@ -280,7 +288,8 @@ impl EventHandler for Stage {
         self.ctx.end_render_pass();
 
         self.ctx.commit_frame();
-    }
+				}
+		}
 
     fn resize_event(&mut self, w: f32, h: f32) {
         self.window_width = w;
