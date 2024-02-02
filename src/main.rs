@@ -524,8 +524,10 @@ mod shader {
 
     varying lowp vec2 texcoord;
 
+    // precision highp float;
+
     void main() {
-        gl_Position = vec4(in_pos + offset, 0, 1);
+        gl_Position = vec4((window_scale * (in_pos.xy + offset))+vec2(-1,1), 0.0, 1.0);
         texcoord = in_uv;
     }"#;
 
@@ -587,7 +589,8 @@ mod shader {
         ShaderMeta {
             images: vec!["tex".to_string()],
             uniforms: UniformBlockLayout {
-                uniforms: vec![UniformDesc::new("offset", UniformType::Float2)],
+                uniforms: vec![UniformDesc::new("offset", UniformType::Float2),
+               								UniformDesc::new("window_scale", UniformType::Float2)],
             },
         }
     }
