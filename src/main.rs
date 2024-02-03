@@ -33,7 +33,7 @@ struct Stage {
     bindings: Bindings,
     window_width: f32,
     window_height: f32,
-		draws_remaining: i32,
+    draws_remaining: i32,
 }
 
 // in texels I.e. not bit array u8 length.
@@ -241,7 +241,7 @@ impl Stage {
             params,
         );
 
-				let draws_remaining = 600;
+        let draws_remaining = 600;
 
         Stage {
             ctx,
@@ -250,7 +250,7 @@ impl Stage {
             bindings,
             window_width,
             window_height,
-						draws_remaining,
+            draws_remaining,
         }
     }
 }
@@ -259,37 +259,36 @@ impl EventHandler for Stage {
     fn update(&mut self) {}
 
     fn draw(&mut self) {
-				if (self.draws_remaining > 0) {
+        if (self.draws_remaining > 0) {
+            // self.draws_remaining -= 1;
 
-						// self.draws_remaining -= 1;
+            let t = date::now();
 
-        let t = date::now();
+            self.ctx.begin_default_pass(Default::default());
 
-        self.ctx.begin_default_pass(Default::default());
+            self.ctx.apply_pipeline(&self.pipeline);
+            self.ctx.apply_bindings(&self.bindings);
+            for i in 0..10 {
+                let t = (t as f64) * 0.05 + (i as f64) * 0.5;
 
-        self.ctx.apply_pipeline(&self.pipeline);
-        self.ctx.apply_bindings(&self.bindings);
-        for i in 0..10 {
-            let t = (t as f64) * 0.05 + (i as f64) * 0.5;
+                self.ctx
+                    .apply_uniforms(UniformsSource::table(&shader::Uniforms {
+                        offset: (
+                            (t.sin() as f32 * 500.0) + 500.0,
+                            ((t * 3.).cos() as f32 * 500.0) + 500.0,
+                        ),
+                        window_scale: (
+                            1.0 / self.window_width.max(0.1),
+                            -1.0 / self.window_height.max(0.1),
+                        ),
+                    }));
+                self.ctx.draw(0, self.index_count, 1);
+            }
+            self.ctx.end_render_pass();
 
-            self.ctx
-                .apply_uniforms(UniformsSource::table(&shader::Uniforms {
-                    offset: (
-                        (t.sin() as f32 * 500.0) + 500.0,
-                        ((t * 3.).cos() as f32 * 500.0) + 500.0,
-                    ),
-                    window_scale: (
-                        1.0 / self.window_width.max(0.1),
-                        -1.0 / self.window_height.max(0.1),
-                    ),
-                }));
-            self.ctx.draw(0, self.index_count, 1);
+            self.ctx.commit_frame();
         }
-        self.ctx.end_render_pass();
-
-        self.ctx.commit_frame();
-				}
-		}
+    }
 
     fn resize_event(&mut self, w: f32, h: f32) {
         self.window_width = w;
@@ -316,7 +315,7 @@ fn main() {
     } else {
         conf::AppleGfxApi::OpenGl
     };
-		conf.high_dpi = true;
+    conf.high_dpi = true;
     println!("Conf.width {}x{}", conf.window_width, conf.window_height);
 
     let mut texture: [u8; 400 * 200 * 4] = [0; 400 * 200 * 4];
@@ -590,8 +589,10 @@ mod shader {
         ShaderMeta {
             images: vec!["tex".to_string()],
             uniforms: UniformBlockLayout {
-                uniforms: vec![UniformDesc::new("offset", UniformType::Float2),
-               								UniformDesc::new("window_scale", UniformType::Float2)],
+                uniforms: vec![
+                    UniformDesc::new("offset", UniformType::Float2),
+                    UniformDesc::new("window_scale", UniformType::Float2),
+                ],
             },
         }
     }
