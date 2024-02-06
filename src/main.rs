@@ -4,10 +4,9 @@ use cosmic_text::{
     Shaping, SubpixelBin, SwashCache, Wrap,
 };
 use miniquad::*;
-use texture_packer::frame::Frame;
 use texture_packer::packer::{Packer, SkylinePacker};
 use texture_packer::rect::Rect;
-use texture_packer::{TexturePacker, TexturePackerConfig};
+use texture_packer::TexturePackerConfig;
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
 use std::cmp::max;
@@ -43,12 +42,8 @@ struct TextLine {
 
 impl TextLine {
     pub fn new<T: Into<String>>(text: T, ctx: &mut Box<dyn RenderingBackend>) -> TextLine {
-        let mut bl_attrs = Attrs::new();
-        let mut buffer_line = BufferLine::new(
-            text, //,
-            AttrsList::new(bl_attrs),
-            Shaping::Advanced,
-        );
+        let bl_attrs = Attrs::new();
+        let mut buffer_line = BufferLine::new(text, AttrsList::new(bl_attrs), Shaping::Advanced);
 
         let config = TexturePackerConfig {
             max_width: ATLAS_WIDTH,
@@ -81,7 +76,7 @@ impl TextLine {
                     y_bin: SubpixelBin::Zero,
                     ..glyph.physical((0.0, 0.0), 1.0).cache_key
                 };
-                if let Some((rect, left, top)) = glyph_loc.get(&glyph_key) {
+                if let Some((rect, _left, _top)) = glyph_loc.get(&glyph_key) {
                     println!(
                         "cached: {:?}: {},{}: {}x{}",
                         glyph_key, rect.x, rect.y, rect.w, rect.h
@@ -290,67 +285,8 @@ struct Stage {
 const ATLAS_WIDTH: u32 = 100;
 
 impl Stage {
-    pub fn new(window_width: f32, window_height: f32, bitmap: [u8; 400 * 200 * 4]) -> Stage {
+    pub fn new(window_width: f32, window_height: f32) -> Stage {
         let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
-
-        let bwidth = 200.0;
-        let bheight = 200.0;
-        #[rustfmt::skip]
-
-				// for buffer text
-				/*let vertices: [Vertex; 4] = [
-            Vertex { pos : Vec2 { x: -0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 0., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 1., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 1., y: 1. } },
-            Vertex { pos : Vec2 { x: -0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 0., y: 1. } },
-    ];*/
-
-
-
-        // for showing the atlas
-        /*
-        let aheight = a_height_u as f32 * 3.0;
-        let awidth = ATLAS_WIDTH as f32 * 3.0;
-
-        #[rustfmt::skip]
-                let vertices: [Vertex; 4] = [
-            Vertex { pos : Vec2 { x: -0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 0., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 1., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 1., y: 1. } },
-            Vertex { pos : Vec2 { x: -0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 0., y: 1. } },];
-                 */
-
-        /*
-                if let Some(line) = buffer_line.shape_opt() {
-                        for span in line.spans {
-                                for word in span.words {
-                                        for glyph in word.glyphs {
-                                        }
-                                }
-                        }
-        }*/
-
-        //one quad
-        /*
-        [(0.,0.),(1.,0.),(1.,1.),(0.,1.)].map(|(x,y)| {
-                            vertices.push(Vertex {
-                    pos: Vec2 { x: x*bwidth, y: y*bheight },
-                    uv: Vec2 { x: x, y: y },
-                });
-        });
-        [0, 1, 2, 0, 2, 3].map(|i| indices.push(0 + i));
-        */
-
-        let pixels: [u8; 4 * 4 * 4] = [
-            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
-            0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF,
-            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0xFF,
-            0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-            0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        ];
-        // let texture = ctx.new_texture_from_rgba8(4, 4, &pixels);
-        // for the hello rust buffer
-        //let texture = ctx.new_texture_from_rgba8(400, 200, &bitmap);
 
         let shader = ctx
             .new_shader(
@@ -479,66 +415,10 @@ fn main() {
     conf.high_dpi = true;
     println!("Conf.width {}x{}", conf.window_width, conf.window_height);
 
-    let mut texture: [u8; 400 * 200 * 4] = [0; 400 * 200 * 4];
-    draw_rect(&mut texture, 0, 0, 400, 200, Color::rgba(0, 0xff, 0, 30));
-    //draw_rect(&mut texture,0,0,200,50,Color(0xffff5000));
-
-    /*
-        let metrics = Metrics::new(14.0 * 4.0, 20.0 * 4.0);
-        let mut buffer = Buffer::new(&mut font_system, metrics);
-        let attrs = Attrs::new();
-        let text_color = Color::rgb(0xFF, 0xFF, 0xFF);
-        let width = 80u16;
-        let height = 25u16;
-        buffer.set_size(&mut font_system, 80.0 * 4.0, 25.0 * 4.0);
-        buffer.set_text(
-            &mut font_system,
-            " Heya, Rust! 🦀",
-            attrs,
-            Shaping::Advanced,
-        );
-        buffer.draw(
-            &mut font_system,
-            &mut swash_cache,
-            text_color,
-            |x, y, w, h, color| {
-                draw_rect(
-                    &mut texture,
-                    usize::try_from(x).unwrap(),
-                    usize::try_from(y).unwrap(),
-                    usize::try_from(w).unwrap(),
-                    usize::try_from(h).unwrap(),
-                    color,
-                );
-            },
-    );
-            */
-    /*
-    for mut bline in buffer.lines {
-        let layout = bline.layout(&mut font_system, 14.0 * 4.0, 80.0 * 4.0, Wrap::None);
-        for line in layout {
-            for glyph in line.glyphs.iter() {
-                println!["bline glyph: {:?}", glyph];
-            }
-        }
-    }*/
-
-    // Fussing with texture atlases
-
-    // let shape = buffer_line.shape_in_buffer(&mut shape_buffer, &mut font_system);
-    // buffer_line.reset_layout(); doesn't do anything
-
-    // let glyph_key = layout_lines[0].glyphs[1].physical((0.0,0.0), 1.0).cache_key;
-
-    // how do I operate over references like this?
-    //let img_w = img.clone().expect("no image").placement.width;
-    // let line = shape.spans[0].words[0].glyphs[0].physical();
-    //swash_cache.get_image(&mut font_system,
-
     let window_width = conf.window_width as f32 * 2.0; // not sure we can get dpi_scale before starting
     let window_height = conf.window_height as f32 * 2.0;
     miniquad::start(conf, move || {
-        Box::new(Stage::new(window_width, window_height, texture))
+        Box::new(Stage::new(window_width, window_height))
     });
 }
 
