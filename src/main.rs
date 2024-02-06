@@ -25,83 +25,164 @@ struct Vertex {
     uv: Vec2,
 }
 
-struct Stage {
-    ctx: Box<dyn RenderingBackend>,
-
-    index_count: i32,
-    pipeline: Pipeline,
-    bindings: Bindings,
-    window_width: f32,
-    window_height: f32,
-    draws_remaining: i32,
+enum Object {
+    Node,
+    TextLine,
+    Rectangle,
 }
 
-// in texels I.e. not bit array u8 length.
-const ATLAS_WIDTH: u32 = 100;
+struct Node {
+    pos: Vec2,
+    children: Vec<Object>,
+}
 
-impl Stage {
-    pub fn new(
-        window_width: f32,
-        window_height: f32,
-        bitmap: [u8; 400 * 200 * 4],
-        atlas_bitmap: Vec<u8>,
-        glyph_loc: HashMap<CacheKey, (Rect, i32, i32)>,
-        buffer_line: BufferLine,
-    ) -> Stage {
-        let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
+struct TextLine {
+    bindings: Bindings,
+    index_count: i32,
+}
 
-        let bwidth = 200.0;
-        let bheight = 200.0;
-        #[rustfmt::skip]
+impl TextLine {
+    pub fn new<T: Into<String>>(text: T, ctx: &mut Box<dyn RenderingBackend>) -> TextLine {
+        let mut bl_attrs = Attrs::new();
+        let mut buffer_line = BufferLine::new(
+            text, //,
+            AttrsList::new(bl_attrs),
+            Shaping::Advanced,
+        );
 
-				// for buffer text
-				/*let vertices: [Vertex; 4] = [
-            Vertex { pos : Vec2 { x: -0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 0., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 1., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 1., y: 1. } },
-            Vertex { pos : Vec2 { x: -0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 0., y: 1. } },
-    ];*/
+        let config = TexturePackerConfig {
+            max_width: ATLAS_WIDTH,
+            max_height: 40000,
+            allow_rotation: false,
+            texture_outlines: true,
+            border_padding: 2,
+            ..Default::default()
+        };
+        let mut packer = SkylinePacker::new(config);
+        let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
+        let mut font_system = FontSystem::new();
+        let mut swash_cache = SwashCache::new();
+        let bl_font_size = 72.0;
+        let mut shape_buffer = ShapeBuffer::default();
 
-				let a_height_u = u16::try_from(u32::try_from(atlas_bitmap.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
+        let layout_lines = buffer_line.layout_in_buffer(
+            &mut shape_buffer,
+            &mut font_system,
+            bl_font_size,
+            500.0,
+            Wrap::None,
+        );
 
-        // for showing the atlas
-        /*
-        let aheight = a_height_u as f32 * 3.0;
-        let awidth = ATLAS_WIDTH as f32 * 3.0;
+        // generate atlas locations (no raster yet)
+        for line in layout_lines {
+            for glyph in line.glyphs.iter() {
+                let glyph_key = CacheKey {
+                    x_bin: SubpixelBin::Zero,
+                    y_bin: SubpixelBin::Zero,
+                    ..glyph.physical((0.0, 0.0), 1.0).cache_key
+                };
+                if let Some((rect, left, top)) = glyph_loc.get(&glyph_key) {
+                    println!(
+                        "cached: {:?}: {},{}: {}x{}",
+                        glyph_key, rect.x, rect.y, rect.w, rect.h
+                    );
+                } else {
+                    let maybe_img = swash_cache.get_image(&mut font_system, glyph_key);
 
-        #[rustfmt::skip]
-                let vertices: [Vertex; 4] = [
-            Vertex { pos : Vec2 { x: -0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 0., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 1., y: 0. } },
-            Vertex { pos : Vec2 { x:  0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 1., y: 1. } },
-            Vertex { pos : Vec2 { x: -0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 0., y: 1. } },];
-                 */
+                    if let Some(img) = maybe_img {
+                        let width = img.placement.width;
+                        let height = img.placement.height;
 
+                        let name = "hi";
+                        let frame = packer.pack(name, &Rect::new(0, 0, width, height));
+                        if let Some(frm) = frame {
+                            glyph_loc.insert(
+                                glyph_key,
+                                (frm.frame, img.placement.left, img.placement.top),
+                            );
+                            println!(
+                                "new:    {:?}: {},{}: {}x{}",
+                                glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        let atlas_height = packer
+            .skylines
+            .iter()
+            .fold(0, |h, skyline| max(h, skyline.y));
+        println!("max_height: {}", atlas_height);
+
+        let mut atlas_texture =
+            vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
+        for (glyph_key, (rect, left, top)) in &glyph_loc {
+            let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
+            if let Some(img) = maybe_img {
+                println!["img: {:?}", img.placement];
+                let w = img.placement.width;
+                let h = img.placement.height;
+                let len = img.data.len();
+                match img.content {
+                    Content::Mask => {
+                        assert!(
+                            usize::try_from(w * h).unwrap() == len,
+                            "unexpected img size: {} x {} x {:?} vs {}",
+                            w,
+                            h,
+                            img.content,
+                            len
+                        );
+                        println!("drawing {:?}", (rect, w, h));
+                        for y in 0..h {
+                            for x in 0..w {
+                                let target = usize::try_from(
+                                    (rect.y + y) * ATLAS_WIDTH * 4 + ((rect.x + x) * 4),
+                                )
+                                .unwrap();
+                                atlas_texture[target + 0] = 0xff; // r
+                                atlas_texture[target + 1] = 0xff;
+                                atlas_texture[target + 2] = 0xff;
+                                atlas_texture[target + 3] // a
+															= img.data[usize::try_from(y*w+x).unwrap()];
+                            }
+                        }
+                    }
+                    Content::Color => {
+                        assert!(
+                            usize::try_from(w * h * 4).unwrap() == len,
+                            "unexpected img size: {} x {} x {:?} vs {}",
+                            w,
+                            h,
+                            img.content,
+                            len
+                        );
+                        for y in 0..h {
+                            for x in 0..w {
+                                for c in 0..4 {
+                                    let target = usize::try_from(
+                                        (rect.y + y) * ATLAS_WIDTH * 4 + (rect.x + x) * 4 + c,
+                                    )
+                                    .unwrap();
+                                    let source = usize::try_from(y * w * 4 + x * 4 + c).unwrap();
+                                    atlas_texture[target] = img.data[source];
+                                }
+                            }
+                        }
+                    }
+                    x => println!("unknown content {:?}", x),
+                }
+            }
+        }
+
+        let a_height_u =
+            u16::try_from(u32::try_from(atlas_texture.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
         let a_w = ATLAS_WIDTH as f32;
         let a_h = a_height_u as f32;
         // showing the text using the atlas:
         let mut vertices: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u16> = Vec::new();
-        /*
-                if let Some(line) = buffer_line.shape_opt() {
-                        for span in line.spans {
-                                for word in span.words {
-                                        for glyph in word.glyphs {
-                                        }
-                                }
-                        }
-        }*/
-
-        //one quad
-        /*
-        [(0.,0.),(1.,0.),(1.,1.),(0.,1.)].map(|(x,y)| {
-                            vertices.push(Vertex {
-                    pos: Vec2 { x: x*bwidth, y: y*bheight },
-                    uv: Vec2 { x: x, y: y },
-                });
-        });
-        [0, 1, 2, 0, 2, 3].map(|i| indices.push(0 + i));
-        */
 
         if let Some(lines) = buffer_line.layout_opt() {
             for line in lines {
@@ -158,6 +239,12 @@ impl Stage {
             }
         }
 
+        let texture = ctx.new_texture_from_rgba8(
+            u16::try_from(ATLAS_WIDTH).unwrap(),
+            a_height_u,
+            &atlas_texture,
+        );
+
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
             BufferUsage::Immutable,
@@ -173,6 +260,87 @@ impl Stage {
             BufferSource::slice(&indices),
         );
 
+        let bindings = Bindings {
+            vertex_buffers: vec![vertex_buffer],
+            index_buffer,
+            images: vec![texture],
+        };
+        TextLine {
+            bindings,
+            index_count,
+        }
+    }
+}
+
+struct Rectangle {
+    dim: Vec2,
+}
+
+struct Stage {
+    ctx: Box<dyn RenderingBackend>,
+
+    pipeline: Pipeline,
+    window_width: f32,
+    window_height: f32,
+    draws_remaining: i32,
+    text_line: TextLine,
+}
+
+// in texels I.e. not bit array u8 length.
+const ATLAS_WIDTH: u32 = 100;
+
+impl Stage {
+    pub fn new(window_width: f32, window_height: f32, bitmap: [u8; 400 * 200 * 4]) -> Stage {
+        let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
+
+        let bwidth = 200.0;
+        let bheight = 200.0;
+        #[rustfmt::skip]
+
+				// for buffer text
+				/*let vertices: [Vertex; 4] = [
+            Vertex { pos : Vec2 { x: -0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 0., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*bwidth, y: -0.5*bheight }, uv: Vec2 { x: 1., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 1., y: 1. } },
+            Vertex { pos : Vec2 { x: -0.5*bwidth, y:  0.5*bheight }, uv: Vec2 { x: 0., y: 1. } },
+    ];*/
+
+
+
+        // for showing the atlas
+        /*
+        let aheight = a_height_u as f32 * 3.0;
+        let awidth = ATLAS_WIDTH as f32 * 3.0;
+
+        #[rustfmt::skip]
+                let vertices: [Vertex; 4] = [
+            Vertex { pos : Vec2 { x: -0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 0., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*awidth, y: -0.5*aheight }, uv: Vec2 { x: 1., y: 0. } },
+            Vertex { pos : Vec2 { x:  0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 1., y: 1. } },
+            Vertex { pos : Vec2 { x: -0.5*awidth, y:  0.5*aheight }, uv: Vec2 { x: 0., y: 1. } },];
+                 */
+
+        /*
+                if let Some(line) = buffer_line.shape_opt() {
+                        for span in line.spans {
+                                for word in span.words {
+                                        for glyph in word.glyphs {
+                                        }
+                                }
+                        }
+        }*/
+
+        //one quad
+        /*
+        [(0.,0.),(1.,0.),(1.,1.),(0.,1.)].map(|(x,y)| {
+                            vertices.push(Vertex {
+                    pos: Vec2 { x: x*bwidth, y: y*bheight },
+                    uv: Vec2 { x: x, y: y },
+                });
+        });
+        [0, 1, 2, 0, 2, 3].map(|i| indices.push(0 + i));
+        */
+
         let pixels: [u8; 4 * 4 * 4] = [
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
             0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0xFF,
@@ -183,17 +351,6 @@ impl Stage {
         // let texture = ctx.new_texture_from_rgba8(4, 4, &pixels);
         // for the hello rust buffer
         //let texture = ctx.new_texture_from_rgba8(400, 200, &bitmap);
-        let texture = ctx.new_texture_from_rgba8(
-            u16::try_from(ATLAS_WIDTH).unwrap(),
-            a_height_u,
-            &atlas_bitmap,
-        );
-
-        let bindings = Bindings {
-            vertex_buffers: vec![vertex_buffer],
-            index_buffer: index_buffer,
-            images: vec![texture],
-        };
 
         let shader = ctx
             .new_shader(
@@ -243,14 +400,18 @@ impl Stage {
 
         let draws_remaining = 600;
 
+        let text_line = TextLine::new(
+            "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
+            &mut ctx,
+        );
+
         Stage {
             ctx,
-            index_count,
             pipeline,
-            bindings,
             window_width,
             window_height,
             draws_remaining,
+            text_line,
         }
     }
 }
@@ -267,7 +428,7 @@ impl EventHandler for Stage {
             self.ctx.begin_default_pass(Default::default());
 
             self.ctx.apply_pipeline(&self.pipeline);
-            self.ctx.apply_bindings(&self.bindings);
+            self.ctx.apply_bindings(&self.text_line.bindings);
             for i in 0..10 {
                 let t = (t as f64) * 0.05 + (i as f64) * 0.5;
 
@@ -282,7 +443,7 @@ impl EventHandler for Stage {
                             -1.0 / self.window_height.max(0.1),
                         ),
                     }));
-                self.ctx.draw(0, self.index_count, 1);
+                self.ctx.draw(0, self.text_line.index_count, 1);
             }
             self.ctx.end_render_pass();
 
@@ -321,36 +482,38 @@ fn main() {
     let mut texture: [u8; 400 * 200 * 4] = [0; 400 * 200 * 4];
     draw_rect(&mut texture, 0, 0, 400, 200, Color::rgba(0, 0xff, 0, 30));
     //draw_rect(&mut texture,0,0,200,50,Color(0xffff5000));
-    let mut font_system = FontSystem::new();
-    let mut swash_cache = SwashCache::new();
-    let metrics = Metrics::new(14.0 * 4.0, 20.0 * 4.0);
-    let mut buffer = Buffer::new(&mut font_system, metrics);
-    let attrs = Attrs::new();
-    let text_color = Color::rgb(0xFF, 0xFF, 0xFF);
-    let width = 80u16;
-    let height = 25u16;
-    buffer.set_size(&mut font_system, 80.0 * 4.0, 25.0 * 4.0);
-    buffer.set_text(
-        &mut font_system,
-        " Heya, Rust! 🦀",
-        attrs,
-        Shaping::Advanced,
+
+    /*
+        let metrics = Metrics::new(14.0 * 4.0, 20.0 * 4.0);
+        let mut buffer = Buffer::new(&mut font_system, metrics);
+        let attrs = Attrs::new();
+        let text_color = Color::rgb(0xFF, 0xFF, 0xFF);
+        let width = 80u16;
+        let height = 25u16;
+        buffer.set_size(&mut font_system, 80.0 * 4.0, 25.0 * 4.0);
+        buffer.set_text(
+            &mut font_system,
+            " Heya, Rust! 🦀",
+            attrs,
+            Shaping::Advanced,
+        );
+        buffer.draw(
+            &mut font_system,
+            &mut swash_cache,
+            text_color,
+            |x, y, w, h, color| {
+                draw_rect(
+                    &mut texture,
+                    usize::try_from(x).unwrap(),
+                    usize::try_from(y).unwrap(),
+                    usize::try_from(w).unwrap(),
+                    usize::try_from(h).unwrap(),
+                    color,
+                );
+            },
     );
-    buffer.draw(
-        &mut font_system,
-        &mut swash_cache,
-        text_color,
-        |x, y, w, h, color| {
-            draw_rect(
-                &mut texture,
-                usize::try_from(x).unwrap(),
-                usize::try_from(y).unwrap(),
-                usize::try_from(w).unwrap(),
-                usize::try_from(h).unwrap(),
-                color,
-            );
-        },
-    );
+            */
+    /*
     for mut bline in buffer.lines {
         let layout = bline.layout(&mut font_system, 14.0 * 4.0, 80.0 * 4.0, Wrap::None);
         for line in layout {
@@ -358,140 +521,14 @@ fn main() {
                 println!["bline glyph: {:?}", glyph];
             }
         }
-    }
+    }*/
 
     // Fussing with texture atlases
-    let mut shape_buffer = ShapeBuffer::default();
-    let mut bl_attrs = Attrs::new();
-    let bl_font_size = 72.0;
-    let mut buffer_line = BufferLine::new(
-        "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
-        AttrsList::new(bl_attrs),
-        Shaping::Advanced,
-    );
+
     // let shape = buffer_line.shape_in_buffer(&mut shape_buffer, &mut font_system);
     // buffer_line.reset_layout(); doesn't do anything
-    let layout_lines = buffer_line.layout_in_buffer(
-        &mut shape_buffer,
-        &mut font_system,
-        bl_font_size,
-        500.0,
-        Wrap::None,
-    );
+
     // let glyph_key = layout_lines[0].glyphs[1].physical((0.0,0.0), 1.0).cache_key;
-
-    let config = TexturePackerConfig {
-        max_width: ATLAS_WIDTH,
-        max_height: 40000,
-        allow_rotation: false,
-        texture_outlines: true,
-        border_padding: 2,
-        ..Default::default()
-    };
-    let mut packer = SkylinePacker::new(config);
-    let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
-
-    // generate atlas locations (no raster yet)
-    for line in layout_lines {
-        for glyph in line.glyphs.iter() {
-            let glyph_key = CacheKey {
-                x_bin: SubpixelBin::Zero,
-                y_bin: SubpixelBin::Zero,
-                ..glyph.physical((0.0, 0.0), 1.0).cache_key
-            };
-            if let Some((rect, left, top)) = glyph_loc.get(&glyph_key) {
-                println!(
-                    "cached: {:?}: {},{}: {}x{}",
-                    glyph_key, rect.x, rect.y, rect.w, rect.h
-                );
-            } else {
-                let maybe_img = swash_cache.get_image(&mut font_system, glyph_key);
-
-                if let Some(img) = maybe_img {
-                    let width = img.placement.width;
-                    let height = img.placement.height;
-
-                    let name = "hi";
-                    let frame = packer.pack(name, &Rect::new(0, 0, width, height));
-                    if let Some(frm) = frame {
-                        glyph_loc.insert(
-                            glyph_key,
-                            (frm.frame, img.placement.left, img.placement.top),
-                        );
-                        println!(
-                            "new:    {:?}: {},{}: {}x{}",
-                            glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
-                        );
-                    }
-                }
-            }
-        }
-    }
-    let atlas_height = packer
-        .skylines
-        .iter()
-        .fold(0, |h, skyline| max(h, skyline.y));
-    println!("max_height: {}", atlas_height);
-
-    let mut atlas_texture = vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
-    for (glyph_key, (rect, left, top)) in &glyph_loc {
-        let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
-        if let Some(img) = maybe_img {
-            println!["img: {:?}", img.placement];
-            let w = img.placement.width;
-            let h = img.placement.height;
-            let len = img.data.len();
-            match img.content {
-                Content::Mask => {
-                    assert!(
-                        usize::try_from(w * h).unwrap() == len,
-                        "unexpected img size: {} x {} x {:?} vs {}",
-                        w,
-                        h,
-                        img.content,
-                        len
-                    );
-                    println!("drawing {:?}", (rect, w, h));
-                    for y in 0..h {
-                        for x in 0..w {
-                            let target = usize::try_from(
-                                (rect.y + y) * ATLAS_WIDTH * 4 + ((rect.x + x) * 4),
-                            )
-                            .unwrap();
-                            atlas_texture[target + 0] = 0xff; // r
-                            atlas_texture[target + 1] = 0xff;
-                            atlas_texture[target + 2] = 0xff;
-                            atlas_texture[target + 3] // a
-															= img.data[usize::try_from(y*w+x).unwrap()];
-                        }
-                    }
-                }
-                Content::Color => {
-                    assert!(
-                        usize::try_from(w * h * 4).unwrap() == len,
-                        "unexpected img size: {} x {} x {:?} vs {}",
-                        w,
-                        h,
-                        img.content,
-                        len
-                    );
-                    for y in 0..h {
-                        for x in 0..w {
-                            for c in 0..4 {
-                                let target = usize::try_from(
-                                    (rect.y + y) * ATLAS_WIDTH * 4 + (rect.x + x) * 4 + c,
-                                )
-                                .unwrap();
-                                let source = usize::try_from(y * w * 4 + x * 4 + c).unwrap();
-                                atlas_texture[target] = img.data[source];
-                            }
-                        }
-                    }
-                }
-                x => println!("unknown content {:?}", x),
-            }
-        }
-    }
 
     // how do I operate over references like this?
     //let img_w = img.clone().expect("no image").placement.width;
@@ -501,14 +538,7 @@ fn main() {
     let window_width = conf.window_width as f32 * 2.0; // not sure we can get dpi_scale before starting
     let window_height = conf.window_height as f32 * 2.0;
     miniquad::start(conf, move || {
-        Box::new(Stage::new(
-            window_width,
-            window_height,
-            texture,
-            atlas_texture,
-            glyph_loc,
-            buffer_line,
-        ))
+        Box::new(Stage::new(window_width, window_height, texture))
     });
 }
 
