@@ -35,13 +35,26 @@ struct Node {
     children: Vec<Object>,
 }
 
+struct TextComponent {
+		glyph_loc: HashMap<CacheKey, (Rect, i32, i32)>,
+}
+
+impl TextComponent {
+		pub fn new() -> TextComponent {
+				let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
+				TextComponent {
+						glyph_loc
+				}
+		}
+}
+
 struct TextLine {
     bindings: Bindings,
     index_count: i32,
 }
 
 impl TextLine {
-    pub fn new<T: Into<String>>(text: T, ctx: &mut Box<dyn RenderingBackend>) -> TextLine {
+    pub fn new<T: Into<String>>(text: T, ctx: &mut Box<dyn RenderingBackend>, text_component: &mut TextComponent) -> TextLine {
         let bl_attrs = Attrs::new();
         let mut buffer_line = BufferLine::new(text, AttrsList::new(bl_attrs), Shaping::Advanced);
 
@@ -54,7 +67,6 @@ impl TextLine {
             ..Default::default()
         };
         let mut packer = SkylinePacker::new(config);
-        let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
         let mut font_system = FontSystem::new();
         let mut swash_cache = SwashCache::new();
         let bl_font_size = 72.0;
@@ -76,7 +88,7 @@ impl TextLine {
                     y_bin: SubpixelBin::Zero,
                     ..glyph.physical((0.0, 0.0), 1.0).cache_key
                 };
-                if let Some((rect, _left, _top)) = glyph_loc.get(&glyph_key) {
+                if let Some((rect, _left, _top)) = text_component.glyph_loc.get(&glyph_key) {
                     println!(
                         "cached: {:?}: {},{}: {}x{}",
                         glyph_key, rect.x, rect.y, rect.w, rect.h
@@ -91,7 +103,7 @@ impl TextLine {
                         let name = "hi";
                         let frame = packer.pack(name, &Rect::new(0, 0, width, height));
                         if let Some(frm) = frame {
-                            glyph_loc.insert(
+                            text_component.glyph_loc.insert(
                                 glyph_key,
                                 (frm.frame, img.placement.left, img.placement.top),
                             );
@@ -112,7 +124,7 @@ impl TextLine {
 
         let mut atlas_texture =
             vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
-        for (glyph_key, (rect, left, top)) in &glyph_loc {
+        for (glyph_key, (rect, left, top)) in &text_component.glyph_loc {
             let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
             if let Some(img) = maybe_img {
                 println!["img: {:?}", img.placement];
@@ -191,7 +203,7 @@ impl TextLine {
                     };
                     // This is using the atlas for width, but if I scale it that won't always be true.
                     // just because there's no "height" for glyphs and I'm not sure why.
-                    if let Some((rect, left, top)) = glyph_loc.get(&glyph_key) {
+                    if let Some((rect, left, top)) = text_component.glyph_loc.get(&glyph_key) {
                         let pre_length = vertices.len() as u16;
                         // just taking stabs in the dark. This is clearly not right.
                         //  - (real_key.x_bin.as_float() * -1.0)
@@ -336,9 +348,12 @@ impl Stage {
 
         let draws_remaining = 600;
 
+				let mut text_component = TextComponent::new();
+
         let text_line = TextLine::new(
             "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
             &mut ctx,
+						&mut text_component,
         );
 
         Stage {
