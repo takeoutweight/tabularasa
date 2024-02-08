@@ -1,6 +1,5 @@
-use cosmic_text::rustybuzz::ttf_parser::vorg::VerticalOriginMetrics;
 use cosmic_text::{
-    Attrs, AttrsList, Buffer, BufferLine, CacheKey, Color, FontSystem, Metrics, ShapeBuffer,
+    Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, ShapeBuffer,
     Shaping, SubpixelBin, SwashCache, Wrap,
 };
 use miniquad::*;
@@ -44,10 +43,10 @@ struct TextComponent {
 
 impl TextComponent {
     pub fn new() -> TextComponent {
-        let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
-        let mut font_system = FontSystem::new();
-        let mut swash_cache = SwashCache::new();
-        let mut shape_buffer = ShapeBuffer::default();
+        let glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
+        let font_system = FontSystem::new();
+        let swash_cache = SwashCache::new();
+        let shape_buffer = ShapeBuffer::default();
         TextComponent {
             glyph_loc,
             font_system,
@@ -135,7 +134,7 @@ impl TextLine {
 
         let mut atlas_texture =
             vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
-        for (glyph_key, (rect, left, top)) in &text_component.glyph_loc {
+        for (glyph_key, (rect, _left, _top)) in &text_component.glyph_loc {
             let maybe_img = text_component.swash_cache.get_image(&mut text_component.font_system, *glyph_key);
             if let Some(img) = maybe_img {
                 println!["img: {:?}", img.placement];
@@ -383,7 +382,7 @@ impl EventHandler for Stage {
     fn update(&mut self) {}
 
     fn draw(&mut self) {
-        if (self.draws_remaining > 0) {
+        if self.draws_remaining > 0 {
             // self.draws_remaining -= 1;
 
             let t = date::now();
@@ -506,7 +505,7 @@ mod shader {
     };
 
     vertex RasterizerData vertexShader(
-      Vertex v [[stage_in]], 
+      Vertex v [[stage_in]],
       constant Uniforms& uniforms [[buffer(0)]])
     {
         RasterizerData out;
