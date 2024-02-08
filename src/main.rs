@@ -36,16 +36,25 @@ struct Node {
 }
 
 struct TextComponent {
-		glyph_loc: HashMap<CacheKey, (Rect, i32, i32)>,
+    glyph_loc: HashMap<CacheKey, (Rect, i32, i32)>,
+    font_system: FontSystem,
+    swash_cache: SwashCache,
+    shape_buffer: ShapeBuffer,
 }
 
 impl TextComponent {
-		pub fn new() -> TextComponent {
-				let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
-				TextComponent {
-						glyph_loc
-				}
-		}
+    pub fn new() -> TextComponent {
+        let mut glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
+        let mut font_system = FontSystem::new();
+        let mut swash_cache = SwashCache::new();
+        let mut shape_buffer = ShapeBuffer::default();
+        TextComponent {
+            glyph_loc,
+            font_system,
+            swash_cache,
+            shape_buffer,
+        }
+    }
 }
 
 struct TextLine {
@@ -54,7 +63,11 @@ struct TextLine {
 }
 
 impl TextLine {
-    pub fn new<T: Into<String>>(text: T, ctx: &mut Box<dyn RenderingBackend>, text_component: &mut TextComponent) -> TextLine {
+    pub fn new<T: Into<String>>(
+        text: T,
+        ctx: &mut Box<dyn RenderingBackend>,
+        text_component: &mut TextComponent,
+    ) -> TextLine {
         let bl_attrs = Attrs::new();
         let mut buffer_line = BufferLine::new(text, AttrsList::new(bl_attrs), Shaping::Advanced);
 
@@ -67,14 +80,12 @@ impl TextLine {
             ..Default::default()
         };
         let mut packer = SkylinePacker::new(config);
-        let mut font_system = FontSystem::new();
-        let mut swash_cache = SwashCache::new();
+
         let bl_font_size = 72.0;
-        let mut shape_buffer = ShapeBuffer::default();
 
         let layout_lines = buffer_line.layout_in_buffer(
-            &mut shape_buffer,
-            &mut font_system,
+            &mut text_component.shape_buffer,
+            &mut text_component.font_system,
             bl_font_size,
             500.0,
             Wrap::None,
@@ -94,7 +105,7 @@ impl TextLine {
                         glyph_key, rect.x, rect.y, rect.w, rect.h
                     );
                 } else {
-                    let maybe_img = swash_cache.get_image(&mut font_system, glyph_key);
+                    let maybe_img = text_component.swash_cache.get_image(&mut text_component.font_system, glyph_key);
 
                     if let Some(img) = maybe_img {
                         let width = img.placement.width;
@@ -125,7 +136,7 @@ impl TextLine {
         let mut atlas_texture =
             vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
         for (glyph_key, (rect, left, top)) in &text_component.glyph_loc {
-            let maybe_img = swash_cache.get_image(&mut font_system, *glyph_key);
+            let maybe_img = text_component.swash_cache.get_image(&mut text_component.font_system, *glyph_key);
             if let Some(img) = maybe_img {
                 println!["img: {:?}", img.placement];
                 let w = img.placement.width;
@@ -151,8 +162,9 @@ impl TextLine {
                                 atlas_texture[target + 0] = 0xff; // r
                                 atlas_texture[target + 1] = 0xff;
                                 atlas_texture[target + 2] = 0xff;
-                                atlas_texture[target + 3] // a
-															= img.data[usize::try_from(y*w+x).unwrap()];
+                                // a
+                                atlas_texture[target + 3] =
+                                    img.data[usize::try_from(y * w + x).unwrap()];
                             }
                         }
                     }
@@ -348,12 +360,12 @@ impl Stage {
 
         let draws_remaining = 600;
 
-				let mut text_component = TextComponent::new();
+        let mut text_component = TextComponent::new();
 
         let text_line = TextLine::new(
             "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
             &mut ctx,
-						&mut text_component,
+            &mut text_component,
         );
 
         Stage {
