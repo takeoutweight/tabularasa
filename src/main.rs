@@ -1,6 +1,6 @@
 use cosmic_text::{
-    Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, ShapeBuffer,
-    Shaping, SubpixelBin, SwashCache, Wrap,
+    Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, ShapeBuffer, Shaping, SubpixelBin,
+    SwashCache, Wrap,
 };
 use miniquad::*;
 use texture_packer::packer::{Packer, SkylinePacker};
@@ -91,36 +91,40 @@ impl TextLine {
         );
 
         // generate atlas locations (no raster yet)
-        for line in layout_lines {
-            for glyph in line.glyphs.iter() {
-                let glyph_key = CacheKey {
-                    x_bin: SubpixelBin::Zero,
-                    y_bin: SubpixelBin::Zero,
-                    ..glyph.physical((0.0, 0.0), 1.0).cache_key
-                };
-                if let Some((rect, _left, _top)) = text_component.glyph_loc.get(&glyph_key) {
-                    println!(
-                        "cached: {:?}: {},{}: {}x{}",
-                        glyph_key, rect.x, rect.y, rect.w, rect.h
-                    );
-                } else {
-                    let maybe_img = text_component.swash_cache.get_image(&mut text_component.font_system, glyph_key);
+        if let Some(lines) = buffer_line.layout_opt() {
+            for line in lines {
+                for glyph in line.glyphs.iter() {
+                    let glyph_key = CacheKey {
+                        x_bin: SubpixelBin::Zero,
+                        y_bin: SubpixelBin::Zero,
+                        ..glyph.physical((0.0, 0.0), 1.0).cache_key
+                    };
+                    if let Some((rect, _left, _top)) = text_component.glyph_loc.get(&glyph_key) {
+                        println!(
+                            "cached: {:?}: {},{}: {}x{}",
+                            glyph_key, rect.x, rect.y, rect.w, rect.h
+                        );
+                    } else {
+                        let maybe_img = text_component
+                            .swash_cache
+                            .get_image(&mut text_component.font_system, glyph_key);
 
-                    if let Some(img) = maybe_img {
-                        let width = img.placement.width;
-                        let height = img.placement.height;
+                        if let Some(img) = maybe_img {
+                            let width = img.placement.width;
+                            let height = img.placement.height;
 
-                        let name = "hi";
-                        let frame = packer.pack(name, &Rect::new(0, 0, width, height));
-                        if let Some(frm) = frame {
-                            text_component.glyph_loc.insert(
-                                glyph_key,
-                                (frm.frame, img.placement.left, img.placement.top),
-                            );
-                            println!(
-                                "new:    {:?}: {},{}: {}x{}",
-                                glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
-                            );
+                            let name = "hi";
+                            let frame = packer.pack(name, &Rect::new(0, 0, width, height));
+                            if let Some(frm) = frame {
+                                text_component.glyph_loc.insert(
+                                    glyph_key,
+                                    (frm.frame, img.placement.left, img.placement.top),
+                                );
+                                println!(
+                                    "new:    {:?}: {},{}: {}x{}",
+                                    glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
+                                );
+                            }
                         }
                     }
                 }
@@ -135,7 +139,9 @@ impl TextLine {
         let mut atlas_texture =
             vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
         for (glyph_key, (rect, _left, _top)) in &text_component.glyph_loc {
-            let maybe_img = text_component.swash_cache.get_image(&mut text_component.font_system, *glyph_key);
+            let maybe_img = text_component
+                .swash_cache
+                .get_image(&mut text_component.font_system, *glyph_key);
             if let Some(img) = maybe_img {
                 println!["img: {:?}", img.placement];
                 let w = img.placement.width;
@@ -198,6 +204,12 @@ impl TextLine {
             u16::try_from(u32::try_from(atlas_texture.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
         let a_w = ATLAS_WIDTH as f32;
         let a_h = a_height_u as f32;
+        let texture = ctx.new_texture_from_rgba8(
+            u16::try_from(ATLAS_WIDTH).unwrap(),
+            a_height_u,
+            &atlas_texture,
+        );
+
         // showing the text using the atlas:
         let mut vertices: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u16> = Vec::new();
@@ -256,12 +268,6 @@ impl TextLine {
                 }
             }
         }
-
-        let texture = ctx.new_texture_from_rgba8(
-            u16::try_from(ATLAS_WIDTH).unwrap(),
-            a_height_u,
-            &atlas_texture,
-        );
 
         let vertex_buffer = ctx.new_buffer(
             BufferType::VertexBuffer,
