@@ -299,6 +299,29 @@ impl TextLine {
     }
 }
 
+impl Stage {
+    pub fn insert_text(&mut self, texts: Vec<String>) {
+        let laid_out: Vec<BufferLine> = texts
+            .iter()
+            .map(|text| layout(text, &mut self.text_component))
+            .collect();
+
+        let incomplete_atlas = laid_out.iter().flat_map(glyphs).any(|glyph| {
+            let glyph_key = CacheKey {
+                x_bin: SubpixelBin::Zero,
+                y_bin: SubpixelBin::Zero,
+                ..glyph.physical((0.0, 0.0), 1.0).cache_key
+            };
+            !self.text_component.glyph_loc.contains_key(&glyph_key)
+        });
+
+        if incomplete_atlas {
+            self.text_component.glyph_loc.clear();
+            // TODO
+        }
+    }
+}
+
 struct Rectangle {
     dim: Vec2,
 }
@@ -310,6 +333,8 @@ struct Stage {
     window_width: f32,
     window_height: f32,
     draws_remaining: i32,
+    text_component: TextComponent,
+    laid_out_lines: Vec<BufferLine>,
     text_lines: Vec<TextLine>,
 }
 
@@ -374,7 +399,12 @@ impl Stage {
             "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
             &mut text_component,
         );
-        let text_lines = vec![TextLine::new(&lines, &mut ctx, &mut text_component)];
+        let laid_out_lines = vec![lines];
+        let text_lines = vec![TextLine::new(
+            &laid_out_lines[0],
+            &mut ctx,
+            &mut text_component,
+        )];
 
         Stage {
             ctx,
@@ -382,6 +412,8 @@ impl Stage {
             window_width,
             window_height,
             draws_remaining,
+            text_component,
+            laid_out_lines,
             text_lines,
         }
     }
