@@ -310,7 +310,7 @@ struct Stage {
     window_width: f32,
     window_height: f32,
     draws_remaining: i32,
-    text_line: TextLine,
+    text_lines: Vec<TextLine>,
 }
 
 // in texels I.e. not bit array u8 length.
@@ -374,7 +374,7 @@ impl Stage {
             "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
             &mut text_component,
         );
-        let text_line = TextLine::new(&lines, &mut ctx, &mut text_component);
+        let text_lines = vec![TextLine::new(&lines, &mut ctx, &mut text_component)];
 
         Stage {
             ctx,
@@ -382,7 +382,7 @@ impl Stage {
             window_width,
             window_height,
             draws_remaining,
-            text_line,
+            text_lines,
         }
     }
 }
@@ -399,22 +399,24 @@ impl EventHandler for Stage {
             self.ctx.begin_default_pass(Default::default());
 
             self.ctx.apply_pipeline(&self.pipeline);
-            self.ctx.apply_bindings(&self.text_line.bindings);
-            for i in 0..10 {
-                let t = (t as f64) * 0.05 + (i as f64) * 0.5;
+            for text_line in self.text_lines.iter() {
+                self.ctx.apply_bindings(&text_line.bindings);
+                for i in 0..10 {
+                    let t = (t as f64) * 0.05 + (i as f64) * 0.5;
 
-                self.ctx
-                    .apply_uniforms(UniformsSource::table(&shader::Uniforms {
-                        offset: (
-                            (t.sin() as f32 * 500.0) + 500.0,
-                            ((t * 3.).cos() as f32 * 500.0) + 500.0,
-                        ),
-                        window_scale: (
-                            1.0 / self.window_width.max(0.1),
-                            -1.0 / self.window_height.max(0.1),
-                        ),
-                    }));
-                self.ctx.draw(0, self.text_line.index_count, 1);
+                    self.ctx
+                        .apply_uniforms(UniformsSource::table(&shader::Uniforms {
+                            offset: (
+                                (t.sin() as f32 * 500.0) + 500.0,
+                                ((t * 3.).cos() as f32 * 500.0) + 500.0,
+                            ),
+                            window_scale: (
+                                1.0 / self.window_width.max(0.1),
+                                -1.0 / self.window_height.max(0.1),
+                            ),
+                        }));
+                    self.ctx.draw(0, text_line.index_count, 1);
+                }
             }
             self.ctx.end_render_pass();
 
