@@ -1,6 +1,6 @@
 use cosmic_text::{
-    Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, ShapeBuffer, Shaping, SubpixelBin,
-    SwashCache, Wrap,
+    Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, LayoutGlyph, LayoutLine,
+    ShapeBuffer, Shaping, SubpixelBin, SwashCache, Wrap,
 };
 use miniquad::*;
 use texture_packer::packer::{Packer, SkylinePacker};
@@ -61,15 +61,34 @@ struct TextLine {
     index_count: i32,
 }
 
+fn layout<T: Into<String>>(text: T, text_component: &mut TextComponent) -> BufferLine {
+    let bl_attrs = Attrs::new();
+    let mut buffer_line = BufferLine::new(text, AttrsList::new(bl_attrs), Shaping::Advanced);
+    let bl_font_size = 72.0;
+
+    buffer_line.layout_in_buffer(
+        &mut text_component.shape_buffer,
+        &mut text_component.font_system,
+        bl_font_size,
+        500.0,
+        Wrap::None,
+    );
+    return buffer_line;
+}
+
+fn glyphs(buffer_line: &BufferLine) -> impl Iterator<Item = &LayoutGlyph> {
+    buffer_line
+        .layout_opt()
+        .iter()
+        .flat_map(|lines| lines.iter().flat_map(|line| line.glyphs.iter()))
+}
+
 impl TextLine {
-    pub fn new<T: Into<String>>(
-        text: T,
+    pub fn new(
+        buffer_line: &BufferLine,
         ctx: &mut Box<dyn RenderingBackend>,
         text_component: &mut TextComponent,
     ) -> TextLine {
-        let bl_attrs = Attrs::new();
-        let mut buffer_line = BufferLine::new(text, AttrsList::new(bl_attrs), Shaping::Advanced);
-
         let config = TexturePackerConfig {
             max_width: ATLAS_WIDTH,
             max_height: 40000,
@@ -80,56 +99,44 @@ impl TextLine {
         };
         let mut packer = SkylinePacker::new(config);
 
-        let bl_font_size = 72.0;
+        // generate atlas locations
 
-        let layout_lines = buffer_line.layout_in_buffer(
-            &mut text_component.shape_buffer,
-            &mut text_component.font_system,
-            bl_font_size,
-            500.0,
-            Wrap::None,
-        );
+        for glyph in glyphs(buffer_line) {
+            let glyph_key = CacheKey {
+                x_bin: SubpixelBin::Zero,
+                y_bin: SubpixelBin::Zero,
+                ..glyph.physical((0.0, 0.0), 1.0).cache_key
+            };
+            if let Some((rect, _left, _top)) = text_component.glyph_loc.get(&glyph_key) {
+                println!(
+                    "cached: {:?}: {},{}: {}x{}",
+                    glyph_key, rect.x, rect.y, rect.w, rect.h
+                );
+            } else {
+                let maybe_img = text_component
+                    .swash_cache
+                    .get_image(&mut text_component.font_system, glyph_key);
 
-        // generate atlas locations (no raster yet)
-        if let Some(lines) = buffer_line.layout_opt() {
-            for line in lines {
-                for glyph in line.glyphs.iter() {
-                    let glyph_key = CacheKey {
-                        x_bin: SubpixelBin::Zero,
-                        y_bin: SubpixelBin::Zero,
-                        ..glyph.physical((0.0, 0.0), 1.0).cache_key
-                    };
-                    if let Some((rect, _left, _top)) = text_component.glyph_loc.get(&glyph_key) {
-                        println!(
-                            "cached: {:?}: {},{}: {}x{}",
-                            glyph_key, rect.x, rect.y, rect.w, rect.h
+                if let Some(img) = maybe_img {
+                    let width = img.placement.width;
+                    let height = img.placement.height;
+
+                    let name = "hi";
+                    let frame = packer.pack(name, &Rect::new(0, 0, width, height));
+                    if let Some(frm) = frame {
+                        text_component.glyph_loc.insert(
+                            glyph_key,
+                            (frm.frame, img.placement.left, img.placement.top),
                         );
-                    } else {
-                        let maybe_img = text_component
-                            .swash_cache
-                            .get_image(&mut text_component.font_system, glyph_key);
-
-                        if let Some(img) = maybe_img {
-                            let width = img.placement.width;
-                            let height = img.placement.height;
-
-                            let name = "hi";
-                            let frame = packer.pack(name, &Rect::new(0, 0, width, height));
-                            if let Some(frm) = frame {
-                                text_component.glyph_loc.insert(
-                                    glyph_key,
-                                    (frm.frame, img.placement.left, img.placement.top),
-                                );
-                                println!(
-                                    "new:    {:?}: {},{}: {}x{}",
-                                    glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
-                                );
-                            }
-                        }
+                        println!(
+                            "new:    {:?}: {},{}: {}x{}",
+                            glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
+                        );
                     }
                 }
             }
         }
+
         let atlas_height = packer
             .skylines
             .iter()
@@ -214,58 +221,54 @@ impl TextLine {
         let mut vertices: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u16> = Vec::new();
 
-        if let Some(lines) = buffer_line.layout_opt() {
-            for line in lines {
-                for glyph in line.glyphs.iter() {
-                    // todo abstract
-                    let real_key = glyph.physical((0.0, 0.0), 1.0).cache_key;
-                    let glyph_key = CacheKey {
-                        x_bin: SubpixelBin::Zero,
-                        y_bin: SubpixelBin::Zero,
-                        ..real_key
-                    };
-                    // This is using the atlas for width, but if I scale it that won't always be true.
-                    // just because there's no "height" for glyphs and I'm not sure why.
-                    if let Some((rect, left, top)) = text_component.glyph_loc.get(&glyph_key) {
-                        let pre_length = vertices.len() as u16;
-                        // just taking stabs in the dark. This is clearly not right.
-                        //  - (real_key.x_bin.as_float() * -1.0)
-                        let vx = glyph.x + (*left as f32); //glyph.physical((0.0, 0.0), 1.0).x as f32;
-                        let vy = (glyph.y as f32) + (rect.h as f32) - (*top as f32); // glyph.physical((0.0, 0.0), 1.0).y as f32;
-                        let vw = rect.w as f32; // glyph.w; //using rect.w makes the characters look right but spaced wrong.
-                        let vh = rect.h as f32;
-                        let tx = (rect.x as f32) / a_w;
-                        let ty = rect.y as f32 / a_h;
-                        let tw = rect.w as f32 / a_w;
-                        let th = rect.h as f32 / a_h;
-                        vertices.push(Vertex {
-                            pos: Vec2 { x: vx, y: vy - vh },
-                            uv: Vec2 { x: tx, y: ty },
-                        });
-                        vertices.push(Vertex {
-                            pos: Vec2 {
-                                x: vx + vw,
-                                y: vy - vh,
-                            },
-                            uv: Vec2 { x: tx + tw, y: ty },
-                        });
-                        vertices.push(Vertex {
-                            pos: Vec2 { x: vx + vw, y: vy },
-                            uv: Vec2 {
-                                x: tx + tw,
-                                y: ty + th,
-                            },
-                        });
-                        vertices.push(Vertex {
-                            pos: Vec2 { x: vx, y: vy },
-                            uv: Vec2 { x: tx, y: ty + th },
-                        });
+        for glyph in glyphs(buffer_line) {
+            // todo abstract
+            let real_key = glyph.physical((0.0, 0.0), 1.0).cache_key;
+            let glyph_key = CacheKey {
+                x_bin: SubpixelBin::Zero,
+                y_bin: SubpixelBin::Zero,
+                ..real_key
+            };
+            // This is using the atlas for width, but if I scale it that won't always be true.
+            // just because there's no "height" for glyphs and I'm not sure why.
+            if let Some((rect, left, top)) = text_component.glyph_loc.get(&glyph_key) {
+                let pre_length = vertices.len() as u16;
+                // just taking stabs in the dark. This is clearly not right.
+                //  - (real_key.x_bin.as_float() * -1.0)
+                let vx = glyph.x + (*left as f32); //glyph.physical((0.0, 0.0), 1.0).x as f32;
+                let vy = (glyph.y as f32) + (rect.h as f32) - (*top as f32); // glyph.physical((0.0, 0.0), 1.0).y as f32;
+                let vw = rect.w as f32; // glyph.w; //using rect.w makes the characters look right but spaced wrong.
+                let vh = rect.h as f32;
+                let tx = (rect.x as f32) / a_w;
+                let ty = rect.y as f32 / a_h;
+                let tw = rect.w as f32 / a_w;
+                let th = rect.h as f32 / a_h;
+                vertices.push(Vertex {
+                    pos: Vec2 { x: vx, y: vy - vh },
+                    uv: Vec2 { x: tx, y: ty },
+                });
+                vertices.push(Vertex {
+                    pos: Vec2 {
+                        x: vx + vw,
+                        y: vy - vh,
+                    },
+                    uv: Vec2 { x: tx + tw, y: ty },
+                });
+                vertices.push(Vertex {
+                    pos: Vec2 { x: vx + vw, y: vy },
+                    uv: Vec2 {
+                        x: tx + tw,
+                        y: ty + th,
+                    },
+                });
+                vertices.push(Vertex {
+                    pos: Vec2 { x: vx, y: vy },
+                    uv: Vec2 { x: tx, y: ty + th },
+                });
 
-                        [0, 1, 2, 0, 2, 3].map(|i| indices.push(pre_length + i));
-                        // println!("Adding quad: {:?}", (vx, vy, vw, vh, tx, real_key.x_bin.as_float(), ty, tw, th));
-                        println!("adding quad: {:?}", glyph);
-                    }
-                }
+                [0, 1, 2, 0, 2, 3].map(|i| indices.push(pre_length + i));
+                // println!("Adding quad: {:?}", (vx, vy, vw, vh, tx, real_key.x_bin.as_float(), ty, tw, th));
+                println!("adding quad: {:?}", glyph);
             }
         }
 
@@ -367,11 +370,11 @@ impl Stage {
 
         let mut text_component = TextComponent::new();
 
-        let text_line = TextLine::new(
+        let lines = layout(
             "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
-            &mut ctx,
             &mut text_component,
         );
+        let text_line = TextLine::new(&lines, &mut ctx, &mut text_component);
 
         Stage {
             ctx,
