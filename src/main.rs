@@ -34,7 +34,14 @@ struct Node {
     children: Vec<Object>,
 }
 
+struct Atlas {
+    id: TextureId,
+    width: f32,
+    height: f32,
+}
+
 struct TextComponent {
+    texture_atlas: Option<Atlas>,
     glyph_loc: HashMap<CacheKey, (Rect, i32, i32)>,
     font_system: FontSystem,
     swash_cache: SwashCache,
@@ -43,11 +50,13 @@ struct TextComponent {
 
 impl TextComponent {
     pub fn new() -> TextComponent {
+        let texture_atlas = None;
         let glyph_loc: HashMap<CacheKey, (Rect, i32, i32)> = HashMap::new();
         let font_system = FontSystem::new();
         let swash_cache = SwashCache::new();
         let shape_buffer = ShapeBuffer::default();
         TextComponent {
+            texture_atlas,
             glyph_loc,
             font_system,
             swash_cache,
@@ -85,138 +94,13 @@ fn glyphs(buffer_line: &BufferLine) -> impl Iterator<Item = &LayoutGlyph> {
 
 impl TextLine {
     pub fn new(
+        atlas_id: TextureId,
+        atlas_w: f32,
+        atlas_h: f32,
         buffer_line: &BufferLine,
         ctx: &mut Box<dyn RenderingBackend>,
         text_component: &mut TextComponent,
     ) -> TextLine {
-        let config = TexturePackerConfig {
-            max_width: ATLAS_WIDTH,
-            max_height: 40000,
-            allow_rotation: false,
-            texture_outlines: true,
-            border_padding: 2,
-            ..Default::default()
-        };
-        let mut packer = SkylinePacker::new(config);
-
-        // generate atlas locations
-
-        for glyph in glyphs(buffer_line) {
-            let glyph_key = CacheKey {
-                x_bin: SubpixelBin::Zero,
-                y_bin: SubpixelBin::Zero,
-                ..glyph.physical((0.0, 0.0), 1.0).cache_key
-            };
-            if let Some((rect, _left, _top)) = text_component.glyph_loc.get(&glyph_key) {
-                println!(
-                    "cached: {:?}: {},{}: {}x{}",
-                    glyph_key, rect.x, rect.y, rect.w, rect.h
-                );
-            } else {
-                let maybe_img = text_component
-                    .swash_cache
-                    .get_image(&mut text_component.font_system, glyph_key);
-
-                if let Some(img) = maybe_img {
-                    let width = img.placement.width;
-                    let height = img.placement.height;
-
-                    let name = "hi";
-                    let frame = packer.pack(name, &Rect::new(0, 0, width, height));
-                    if let Some(frm) = frame {
-                        text_component.glyph_loc.insert(
-                            glyph_key,
-                            (frm.frame, img.placement.left, img.placement.top),
-                        );
-                        println!(
-                            "new:    {:?}: {},{}: {}x{}",
-                            glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
-                        );
-                    }
-                }
-            }
-        }
-
-        let atlas_height = packer
-            .skylines
-            .iter()
-            .fold(0, |h, skyline| max(h, skyline.y));
-        println!("max_height: {}", atlas_height);
-
-        let mut atlas_texture =
-            vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
-        for (glyph_key, (rect, _left, _top)) in &text_component.glyph_loc {
-            let maybe_img = text_component
-                .swash_cache
-                .get_image(&mut text_component.font_system, *glyph_key);
-            if let Some(img) = maybe_img {
-                println!["img: {:?}", img.placement];
-                let w = img.placement.width;
-                let h = img.placement.height;
-                let len = img.data.len();
-                match img.content {
-                    Content::Mask => {
-                        assert!(
-                            usize::try_from(w * h).unwrap() == len,
-                            "unexpected img size: {} x {} x {:?} vs {}",
-                            w,
-                            h,
-                            img.content,
-                            len
-                        );
-                        println!("drawing {:?}", (rect, w, h));
-                        for y in 0..h {
-                            for x in 0..w {
-                                let target = usize::try_from(
-                                    (rect.y + y) * ATLAS_WIDTH * 4 + ((rect.x + x) * 4),
-                                )
-                                .unwrap();
-                                atlas_texture[target + 0] = 0xff; // r
-                                atlas_texture[target + 1] = 0xff;
-                                atlas_texture[target + 2] = 0xff;
-                                // a
-                                atlas_texture[target + 3] =
-                                    img.data[usize::try_from(y * w + x).unwrap()];
-                            }
-                        }
-                    }
-                    Content::Color => {
-                        assert!(
-                            usize::try_from(w * h * 4).unwrap() == len,
-                            "unexpected img size: {} x {} x {:?} vs {}",
-                            w,
-                            h,
-                            img.content,
-                            len
-                        );
-                        for y in 0..h {
-                            for x in 0..w {
-                                for c in 0..4 {
-                                    let target = usize::try_from(
-                                        (rect.y + y) * ATLAS_WIDTH * 4 + (rect.x + x) * 4 + c,
-                                    )
-                                    .unwrap();
-                                    let source = usize::try_from(y * w * 4 + x * 4 + c).unwrap();
-                                    atlas_texture[target] = img.data[source];
-                                }
-                            }
-                        }
-                    }
-                    x => println!("unknown content {:?}", x),
-                }
-            }
-        }
-
-        let a_height_u =
-            u16::try_from(u32::try_from(atlas_texture.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
-        let a_w = ATLAS_WIDTH as f32;
-        let a_h = a_height_u as f32;
-        let texture = ctx.new_texture_from_rgba8(
-            u16::try_from(ATLAS_WIDTH).unwrap(),
-            a_height_u,
-            &atlas_texture,
-        );
-
         // showing the text using the atlas:
         let mut vertices: Vec<Vertex> = Vec::new();
         let mut indices: Vec<u16> = Vec::new();
@@ -239,10 +123,10 @@ impl TextLine {
                 let vy = (glyph.y as f32) + (rect.h as f32) - (*top as f32); // glyph.physical((0.0, 0.0), 1.0).y as f32;
                 let vw = rect.w as f32; // glyph.w; //using rect.w makes the characters look right but spaced wrong.
                 let vh = rect.h as f32;
-                let tx = (rect.x as f32) / a_w;
-                let ty = rect.y as f32 / a_h;
-                let tw = rect.w as f32 / a_w;
-                let th = rect.h as f32 / a_h;
+                let tx = (rect.x as f32) / atlas_w;
+                let ty = rect.y as f32 / atlas_h;
+                let tw = rect.w as f32 / atlas_w;
+                let th = rect.h as f32 / atlas_h;
                 vertices.push(Vertex {
                     pos: Vec2 { x: vx, y: vy - vh },
                     uv: Vec2 { x: tx, y: ty },
@@ -269,6 +153,9 @@ impl TextLine {
                 [0, 1, 2, 0, 2, 3].map(|i| indices.push(pre_length + i));
                 // println!("Adding quad: {:?}", (vx, vy, vw, vh, tx, real_key.x_bin.as_float(), ty, tw, th));
                 println!("adding quad: {:?}", glyph);
+            } else {
+                // Can maybe tupule the atlas info with the glyphs
+                panic!("atlas does not have expected glyph");
             }
         }
 
@@ -290,7 +177,7 @@ impl TextLine {
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
             index_buffer,
-            images: vec![texture],
+            images: vec![atlas_id],
         };
         TextLine {
             bindings,
@@ -301,12 +188,12 @@ impl TextLine {
 
 impl Stage {
     pub fn insert_text(&mut self, texts: Vec<String>) {
-        let laid_out: Vec<BufferLine> = texts
+        let new_laid_out: Vec<BufferLine> = texts
             .iter()
             .map(|text| layout(text, &mut self.text_component))
             .collect();
 
-        let incomplete_atlas = laid_out.iter().flat_map(glyphs).any(|glyph| {
+        let incomplete_atlas = new_laid_out.iter().flat_map(glyphs).any(|glyph| {
             let glyph_key = CacheKey {
                 x_bin: SubpixelBin::Zero,
                 y_bin: SubpixelBin::Zero,
@@ -316,9 +203,192 @@ impl Stage {
         });
 
         if incomplete_atlas {
+            println!("Regenerating atlas");
+            let config = TexturePackerConfig {
+                max_width: ATLAS_WIDTH,
+                max_height: 40000,
+                allow_rotation: false,
+                texture_outlines: true,
+                border_padding: 2,
+                ..Default::default()
+            };
+            let mut packer = SkylinePacker::new(config);
+
             self.text_component.glyph_loc.clear();
-            // TODO
-        }
+
+            for glyph in self
+                .laid_out_lines
+                .iter()
+                .chain(new_laid_out.iter())
+                .flat_map(glyphs)
+            {
+                let glyph_key = CacheKey {
+                    x_bin: SubpixelBin::Zero,
+                    y_bin: SubpixelBin::Zero,
+                    ..glyph.physical((0.0, 0.0), 1.0).cache_key
+                };
+                if let Some((rect, _left, _top)) = self.text_component.glyph_loc.get(&glyph_key) {
+                    println!(
+                        "cached: {:?}: {},{}: {}x{}",
+                        glyph_key, rect.x, rect.y, rect.w, rect.h
+                    );
+                } else {
+                    let maybe_img = self
+                        .text_component
+                        .swash_cache
+                        .get_image(&mut self.text_component.font_system, glyph_key);
+
+                    if let Some(img) = maybe_img {
+                        let width = img.placement.width;
+                        let height = img.placement.height;
+
+                        let name = "hi";
+                        let frame = packer.pack(name, &Rect::new(0, 0, width, height));
+                        if let Some(frm) = frame {
+                            self.text_component.glyph_loc.insert(
+                                glyph_key,
+                                (frm.frame, img.placement.left, img.placement.top),
+                            );
+                            println!(
+                                "new:    {:?}: {},{}: {}x{}",
+                                glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
+                            );
+                        }
+                    }
+                }
+            }
+
+            let atlas_height = packer
+                .skylines
+                .iter()
+                .fold(0, |h, skyline| max(h, skyline.y));
+            println!("max_height: {}", atlas_height);
+
+            let mut atlas_texture =
+                vec![0x88_u8; usize::try_from(ATLAS_WIDTH * atlas_height).unwrap() * 4];
+            for (glyph_key, (rect, _left, _top)) in &self.text_component.glyph_loc {
+                let maybe_img = self
+                    .text_component
+                    .swash_cache
+                    .get_image(&mut self.text_component.font_system, *glyph_key);
+                if let Some(img) = maybe_img {
+                    println!["img: {:?}", img.placement];
+                    let w = img.placement.width;
+                    let h = img.placement.height;
+                    let len = img.data.len();
+                    match img.content {
+                        Content::Mask => {
+                            assert!(
+                                usize::try_from(w * h).unwrap() == len,
+                                "unexpected img size: {} x {} x {:?} vs {}",
+                                w,
+                                h,
+                                img.content,
+                                len
+                            );
+                            println!("drawing {:?}", (rect, w, h));
+                            for y in 0..h {
+                                for x in 0..w {
+                                    let target = usize::try_from(
+                                        (rect.y + y) * ATLAS_WIDTH * 4 + ((rect.x + x) * 4),
+                                    )
+                                    .unwrap();
+                                    atlas_texture[target + 0] = 0xff; // r
+                                    atlas_texture[target + 1] = 0xff;
+                                    atlas_texture[target + 2] = 0xff;
+                                    // a
+                                    atlas_texture[target + 3] =
+                                        img.data[usize::try_from(y * w + x).unwrap()];
+                                }
+                            }
+                        }
+                        Content::Color => {
+                            assert!(
+                                usize::try_from(w * h * 4).unwrap() == len,
+                                "unexpected img size: {} x {} x {:?} vs {}",
+                                w,
+                                h,
+                                img.content,
+                                len
+                            );
+                            for y in 0..h {
+                                for x in 0..w {
+                                    for c in 0..4 {
+                                        let target = usize::try_from(
+                                            (rect.y + y) * ATLAS_WIDTH * 4 + (rect.x + x) * 4 + c,
+                                        )
+                                        .unwrap();
+                                        let source =
+                                            usize::try_from(y * w * 4 + x * 4 + c).unwrap();
+                                        atlas_texture[target] = img.data[source];
+                                    }
+                                }
+                            }
+                        }
+                        x => println!("unknown content {:?}", x),
+                    }
+                }
+            }
+
+            if let Some(texture) = &self.text_component.texture_atlas {
+                self.ctx.delete_texture(texture.id)
+            }
+
+            let a_height_u =
+                u16::try_from(u32::try_from(atlas_texture.len()).unwrap() / (ATLAS_WIDTH * 4))
+                    .unwrap();
+
+            let texture = self.ctx.new_texture_from_rgba8(
+                u16::try_from(ATLAS_WIDTH).unwrap(),
+                a_height_u,
+                &atlas_texture,
+            );
+
+            let a_w = ATLAS_WIDTH as f32;
+            let a_h = a_height_u as f32;
+
+            let atlas = Atlas {
+                id: texture,
+                width: a_w,
+                height: a_h,
+            };
+
+            self.text_component.texture_atlas = Some(atlas);
+            self.text_lines.clear();
+            self.text_lines
+                .extend(
+                    new_laid_out
+                        .iter()
+                        .chain(self.laid_out_lines.iter())
+                        .map(|buffer_line| {
+                            TextLine::new(
+                                texture,
+                                a_w,
+                                a_h,
+                                buffer_line,
+                                &mut self.ctx,
+                                &mut self.text_component,
+                            )
+                        }),
+                );
+        } else {
+            if let Some(atlas) = &self.text_component.texture_atlas {
+                let a_id = atlas.id;
+                let a_w = atlas.width;
+                let a_h = atlas.height;
+                self.text_lines
+                    .extend(new_laid_out.iter().map(|buffer_line| {
+                        TextLine::new(
+                            a_id,
+                            a_w,
+                            a_h,
+                            buffer_line,
+                            &mut self.ctx,
+                            &mut self.text_component,
+                        )
+                    }));
+            }
+        };
     }
 }
 
@@ -328,7 +398,6 @@ struct Rectangle {
 
 struct Stage {
     ctx: Box<dyn RenderingBackend>,
-
     pipeline: Pipeline,
     window_width: f32,
     window_height: f32,
@@ -395,16 +464,8 @@ impl Stage {
 
         let mut text_component = TextComponent::new();
 
-        let lines = layout(
-            "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
-            &mut text_component,
-        );
-        let laid_out_lines = vec![lines];
-        let text_lines = vec![TextLine::new(
-            &laid_out_lines[0],
-            &mut ctx,
-            &mut text_component,
-        )];
+        let laid_out_lines = Vec::new();
+        let text_lines = Vec::new();
 
         Stage {
             ctx,
@@ -487,7 +548,13 @@ fn main() {
     let window_width = conf.window_width as f32 * 2.0; // not sure we can get dpi_scale before starting
     let window_height = conf.window_height as f32 * 2.0;
     miniquad::start(conf, move || {
-        Box::new(Stage::new(window_width, window_height))
+        Box::new({
+            let mut stage = Stage::new(window_width, window_height);
+            stage.insert_text(vec![String::from(
+                "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
+            )]);
+            stage
+        })
     });
 }
 
