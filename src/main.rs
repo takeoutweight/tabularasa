@@ -550,9 +550,10 @@ fn main() {
     miniquad::start(conf, move || {
         Box::new({
             let mut stage = Stage::new(window_width, window_height);
-            stage.insert_text(vec![String::from(
-                "my go Buffered Robin Nola Alden Line 🐧🐧🐧 Why is this so nice?",
-            )]);
+            stage.insert_text(vec![
+                String::from("my go Buffered Robin Nola Alden Line"),
+                String::from("________________________________________🐧🐧🐧 Why is this so nice?"),
+            ]);
             stage
         })
     });
