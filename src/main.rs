@@ -1,6 +1,6 @@
 use cosmic_text::{
-    Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, LayoutGlyph, LayoutLine,
-    ShapeBuffer, Shaping, SubpixelBin, SwashCache, Wrap,
+    Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, LayoutGlyph, ShapeBuffer, Shaping,
+    SubpixelBin, SwashCache, Wrap,
 };
 use miniquad::*;
 use texture_packer::packer::{Packer, SkylinePacker};
@@ -23,9 +23,6 @@ struct Vertex {
     pos: Vec2,
     uv: Vec2,
 }
-
-const NUM_COLUMNS: usize = 10 * 10;
-const LINES_PER_COLUMN: usize = 70 * 3;
 
 struct Column {
     pos: Vec2,
@@ -410,10 +407,6 @@ impl Stage {
     }
 }
 
-struct Rectangle {
-    dim: Vec2,
-}
-
 struct Stage {
     ctx: Box<dyn RenderingBackend>,
     pipeline: Pipeline,
@@ -479,7 +472,7 @@ impl Stage {
 
         let draws_remaining = 600;
 
-        let mut text_component = TextComponent::new();
+        let text_component = TextComponent::new();
 
         let laid_out_lines = Vec::new();
         let bound_lines = Vec::new();
@@ -532,7 +525,7 @@ impl EventHandler for Stage {
         }
         // self.draws_remaining -= 1;
 
-        let t = date::now();
+        // let t = date::now();
 
         self.ctx.begin_default_pass(Default::default());
 
