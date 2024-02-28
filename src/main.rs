@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use swash::scale::image::Content;
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 struct Vec2 {
     x: f32,
     y: f32,
@@ -23,21 +24,26 @@ struct Vertex {
     uv: Vec2,
 }
 
-enum Object {
-    Node,
-    TextLine,
-    Rectangle,
-}
+const NUM_COLUMNS: usize = 10 * 10;
+const LINES_PER_COLUMN: usize = 70 * 3;
 
-struct Node {
+struct Column {
     pos: Vec2,
-    children: Vec<Object>,
+    offset: usize,
+    length: usize,
 }
 
 struct Atlas {
     id: TextureId,
     width: f32,
     height: f32,
+}
+
+// combine with TextComponent?
+struct TextData {
+    laid_out_lines: Vec<BufferLine>,
+    bound_lines: Vec<TextLine>,
+    columns: Vec<Column>,
 }
 
 struct TextComponent {
@@ -187,20 +193,38 @@ impl TextLine {
 }
 
 impl Stage {
-    pub fn insert_text(&mut self, texts: Vec<String>) {
-        let new_laid_out: Vec<BufferLine> = texts
-            .iter()
-            .map(|text| layout(text, &mut self.text_component))
-            .collect();
+    // not a str because the bufferline owns them. maybe better to copy inside somewhere?
+    pub fn insert_text(&mut self, texts: &'_ [(Vec2, &'_ [String])]) {
+        let new_offset = self.text_data.laid_out_lines.len();
 
-        let incomplete_atlas = new_laid_out.iter().flat_map(glyphs).any(|glyph| {
-            let glyph_key = CacheKey {
-                x_bin: SubpixelBin::Zero,
-                y_bin: SubpixelBin::Zero,
-                ..glyph.physical((0.0, 0.0), 1.0).cache_key
-            };
-            !self.text_component.glyph_loc.contains_key(&glyph_key)
-        });
+        {
+            let mut cur_offset = new_offset;
+            for (pos, texts) in texts {
+                self.text_data.columns.push(Column {
+                    pos: *pos,
+                    length: texts.len(),
+                    offset: cur_offset,
+                });
+                cur_offset += texts.len();
+                self.text_data.laid_out_lines.extend(
+                    texts
+                        .iter()
+                        .map(|text| layout(text, &mut self.text_component)),
+                );
+            }
+        }
+
+        let incomplete_atlas = self.text_data.laid_out_lines[new_offset..]
+            .iter()
+            .flat_map(glyphs)
+            .any(|glyph| {
+                let glyph_key = CacheKey {
+                    x_bin: SubpixelBin::Zero,
+                    y_bin: SubpixelBin::Zero,
+                    ..glyph.physical((0.0, 0.0), 1.0).cache_key
+                };
+                !self.text_component.glyph_loc.contains_key(&glyph_key)
+            });
 
         if incomplete_atlas {
             println!("Regenerating atlas");
@@ -216,12 +240,7 @@ impl Stage {
 
             self.text_component.glyph_loc.clear();
 
-            for glyph in self
-                .laid_out_lines
-                .iter()
-                .chain(new_laid_out.iter())
-                .flat_map(glyphs)
-            {
+            for glyph in self.text_data.laid_out_lines.iter().flat_map(glyphs) {
                 let glyph_key = CacheKey {
                     x_bin: SubpixelBin::Zero,
                     y_bin: SubpixelBin::Zero,
@@ -354,15 +373,30 @@ impl Stage {
             };
 
             self.text_component.texture_atlas = Some(atlas);
-            self.text_lines.clear();
-            self.text_lines
-                .extend(
-                    new_laid_out
+            self.text_data.bound_lines.clear();
+            self.text_data
+                .bound_lines
+                .extend(self.text_data.laid_out_lines.iter().map(|buffer_line| {
+                    TextLine::new(
+                        texture,
+                        a_w,
+                        a_h,
+                        buffer_line,
+                        &mut self.ctx,
+                        &mut self.text_component,
+                    )
+                }));
+        } else {
+            if let Some(atlas) = &self.text_component.texture_atlas {
+                let a_id = atlas.id;
+                let a_w = atlas.width;
+                let a_h = atlas.height;
+                self.text_data.bound_lines.extend(
+                    self.text_data.laid_out_lines[new_offset..]
                         .iter()
-                        .chain(self.laid_out_lines.iter())
                         .map(|buffer_line| {
                             TextLine::new(
-                                texture,
+                                a_id,
                                 a_w,
                                 a_h,
                                 buffer_line,
@@ -371,22 +405,6 @@ impl Stage {
                             )
                         }),
                 );
-        } else {
-            if let Some(atlas) = &self.text_component.texture_atlas {
-                let a_id = atlas.id;
-                let a_w = atlas.width;
-                let a_h = atlas.height;
-                self.text_lines
-                    .extend(new_laid_out.iter().map(|buffer_line| {
-                        TextLine::new(
-                            a_id,
-                            a_w,
-                            a_h,
-                            buffer_line,
-                            &mut self.ctx,
-                            &mut self.text_component,
-                        )
-                    }));
             }
         };
     }
@@ -403,8 +421,7 @@ struct Stage {
     window_height: f32,
     draws_remaining: i32,
     text_component: TextComponent,
-    laid_out_lines: Vec<BufferLine>,
-    text_lines: Vec<TextLine>,
+    text_data: TextData,
 }
 
 // in texels I.e. not bit array u8 length.
@@ -465,7 +482,13 @@ impl Stage {
         let mut text_component = TextComponent::new();
 
         let laid_out_lines = Vec::new();
-        let text_lines = Vec::new();
+        let bound_lines = Vec::new();
+        let columns = Vec::new();
+        let text_data = TextData {
+            laid_out_lines,
+            bound_lines,
+            columns,
+        };
 
         Stage {
             ctx,
@@ -474,9 +497,29 @@ impl Stage {
             window_height,
             draws_remaining,
             text_component,
-            laid_out_lines,
-            text_lines,
+            text_data,
         }
+    }
+}
+
+const LINE_HEIGHT: f32 = 80.0;
+
+fn draw_column(
+    text_data: &TextData,
+    window_width: f32,
+    window_height: f32,
+    ctx: &mut Box<dyn RenderingBackend>,
+    column: &Column,
+) {
+    let mut cur_y = column.pos.y;
+    for text_line in text_data.bound_lines[column.offset..column.offset + column.length].iter() {
+        ctx.apply_bindings(&text_line.bindings);
+        ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms {
+            offset: (column.pos.x, cur_y),
+            window_scale: (1.0 / window_width.max(0.1), -1.0 / window_height.max(0.1)),
+        }));
+        ctx.draw(0, text_line.index_count, 1);
+        cur_y += LINE_HEIGHT;
     }
 }
 
@@ -484,37 +527,28 @@ impl EventHandler for Stage {
     fn update(&mut self) {}
 
     fn draw(&mut self) {
-        if self.draws_remaining > 0 {
-            // self.draws_remaining -= 1;
-
-            let t = date::now();
-
-            self.ctx.begin_default_pass(Default::default());
-
-            self.ctx.apply_pipeline(&self.pipeline);
-            for text_line in self.text_lines.iter() {
-                self.ctx.apply_bindings(&text_line.bindings);
-                for i in 0..10 {
-                    let t = (t as f64) * 0.05 + (i as f64) * 0.5;
-
-                    self.ctx
-                        .apply_uniforms(UniformsSource::table(&shader::Uniforms {
-                            offset: (
-                                (t.sin() as f32 * 500.0) + 500.0,
-                                ((t * 3.).cos() as f32 * 500.0) + 500.0,
-                            ),
-                            window_scale: (
-                                1.0 / self.window_width.max(0.1),
-                                -1.0 / self.window_height.max(0.1),
-                            ),
-                        }));
-                    self.ctx.draw(0, text_line.index_count, 1);
-                }
-            }
-            self.ctx.end_render_pass();
-
-            self.ctx.commit_frame();
+        if self.draws_remaining <= 0 {
+            return;
         }
+        // self.draws_remaining -= 1;
+
+        let t = date::now();
+
+        self.ctx.begin_default_pass(Default::default());
+
+        self.ctx.apply_pipeline(&self.pipeline);
+        for column in self.text_data.columns.iter() {
+            draw_column(
+                &self.text_data,
+                self.window_width,
+                self.window_height,
+                &mut self.ctx,
+                column,
+            );
+        }
+        self.ctx.end_render_pass();
+
+        self.ctx.commit_frame();
     }
 
     fn resize_event(&mut self, w: f32, h: f32) {
@@ -550,9 +584,23 @@ fn main() {
     miniquad::start(conf, move || {
         Box::new({
             let mut stage = Stage::new(window_width, window_height);
-            stage.insert_text(vec![
-                String::from("my go Buffered Robin Nola Alden Line"),
-                String::from("________________________________________🐧🐧🐧 Why is this so nice?"),
+            stage.insert_text(&vec![
+                (
+                    Vec2 { x: 200.0, y: 200.0 },
+                    vec![
+                        String::from("my go Buffered Robin Nola Alden Line"),
+                        String::from("A Second Line"),
+                        String::from("A Third Line"),
+                    ]
+                    .as_slice(),
+                ),
+                (
+                    Vec2 { x: 200.0, y: 200.0 },
+                    vec![String::from(
+                        "________________________________________🐧🐧🐧 Why is this so nice?",
+                    )]
+                    .as_slice(),
+                ),
             ]);
             stage
         })
