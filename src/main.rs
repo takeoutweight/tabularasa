@@ -2,6 +2,7 @@ use cosmic_text::{
     Attrs, AttrsList, BufferLine, CacheKey, Color, FontSystem, LayoutGlyph, ShapeBuffer, Shaping,
     SubpixelBin, SwashCache, Wrap,
 };
+use fontdb::Family;
 use miniquad::*;
 use texture_packer::packer::{Packer, SkylinePacker};
 use texture_packer::rect::Rect;
@@ -74,9 +75,9 @@ struct TextLine {
 }
 
 fn layout<T: Into<String>>(text: T, text_component: &mut TextComponent) -> BufferLine {
-    let bl_attrs = Attrs::new();
+    let bl_attrs = Attrs::new().family(Family::Name("Menlo"));
     let mut buffer_line = BufferLine::new(text, AttrsList::new(bl_attrs), Shaping::Advanced);
-    let bl_font_size = 72.0;
+    let bl_font_size = 82.0;
 
     buffer_line.layout_in_buffer(
         &mut text_component.shape_buffer,
@@ -124,12 +125,16 @@ impl TextLine {
                 //  - (real_key.x_bin.as_float() * -1.0)
                 let vx = glyph.x + (*left as f32); //glyph.physical((0.0, 0.0), 1.0).x as f32;
                 let vy = (glyph.y as f32) + (rect.h as f32) - (*top as f32); // glyph.physical((0.0, 0.0), 1.0).y as f32;
-                let vw = rect.w as f32; // glyph.w; //using rect.w makes the characters look right but spaced wrong.
-                let vh = rect.h as f32;
-                let tx = (rect.x as f32) / atlas_w;
-                let ty = rect.y as f32 / atlas_h;
-                let tw = rect.w as f32 / atlas_w;
-                let th = rect.h as f32 / atlas_h;
+                                                                             // Not sure why I need to add 2.5 width, the eg underscores don't line up quite right w/o it.
+                                                                             // could be drawing the textures a little off and this is just compensating.
+                                                                             // Also it's definitely not right, eg it will double width of a narrow character etc
+                                                                             // 1.045 leaves tiny gaps in underscores at pt 82
+                let vw = rect.w as f32 * 1.05; // glyph.w; //using rect.w makes the characters look right but spaced wrong.d
+                let vh = rect.h as f32 * 1.05;
+                let tx = (rect.x as f32 + 0.5) / atlas_w;
+                let ty = (rect.y as f32 + 0.5) / atlas_h;
+                let tw = (rect.w as f32 - 1.0 + 0.5) / atlas_w;
+                let th = (rect.h as f32 - 1.0 + 0.5) / atlas_h;
                 vertices.push(Vertex {
                     pos: Vec2 { x: vx, y: vy - vh },
                     uv: Vec2 { x: tx, y: ty },
@@ -155,7 +160,7 @@ impl TextLine {
 
                 [0, 1, 2, 0, 2, 3].map(|i| indices.push(pre_length + i));
                 // println!("Adding quad: {:?}", (vx, vy, vw, vh, tx, real_key.x_bin.as_float(), ty, tw, th));
-                println!("adding quad: {:?}", glyph);
+                // println!("adding quad: {:?}", glyph);
             } else {
                 // Can maybe tupule the atlas info with the glyphs
                 panic!("atlas does not have expected glyph");
@@ -244,10 +249,11 @@ impl Stage {
                     ..glyph.physical((0.0, 0.0), 1.0).cache_key
                 };
                 if let Some((rect, _left, _top)) = self.text_component.glyph_loc.get(&glyph_key) {
+                    /*
                     println!(
                         "cached: {:?}: {},{}: {}x{}",
                         glyph_key, rect.x, rect.y, rect.w, rect.h
-                    );
+                    );*/
                 } else {
                     let maybe_img = self
                         .text_component
@@ -265,10 +271,11 @@ impl Stage {
                                 glyph_key,
                                 (frm.frame, img.placement.left, img.placement.top),
                             );
+                            /*
                             println!(
                                 "new:    {:?}: {},{}: {}x{}",
                                 glyph_key, frm.frame.x, frm.frame.y, frm.frame.w, frm.frame.h
-                            );
+                            );*/
                         }
                     }
                 }
@@ -288,7 +295,7 @@ impl Stage {
                     .swash_cache
                     .get_image(&mut self.text_component.font_system, *glyph_key);
                 if let Some(img) = maybe_img {
-                    println!["img: {:?}", img.placement];
+                    // println!["img: {:?}", img.placement];
                     let w = img.placement.width;
                     let h = img.placement.height;
                     let len = img.data.len();
@@ -302,7 +309,7 @@ impl Stage {
                                 img.content,
                                 len
                             );
-                            println!("drawing {:?}", (rect, w, h));
+                            // println!("drawing {:?}", (rect, w, h));
                             for y in 0..h {
                                 for x in 0..w {
                                     let target = usize::try_from(

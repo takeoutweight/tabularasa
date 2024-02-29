@@ -128,8 +128,6 @@ dependencies = [
 [[package]]
 name = "miniquad"
 version = "0.4.0-alpha.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18742c400c9aa2d9b4ca72d366a38c9e2d896386e50c2e6d905b6028543a0a0b"
 dependencies = [
  "libc",
  "ndk-sys",
@@ -265,6 +263,7 @@ name = "tabularasa"
 version = "0.1.0"
 dependencies = [
  "cosmic-text",
+ "fontdb",
  "miniquad",
  "swash",
  "texture_packer",
