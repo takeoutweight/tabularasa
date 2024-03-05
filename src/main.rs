@@ -9,7 +9,7 @@ use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use swash::scale::image::Content;
 
@@ -356,29 +356,9 @@ impl Stage {
                 )
             }));
     }
-    // not a str because the bufferline owns them. maybe better to copy inside somewhere?
-    pub fn insert_text(&mut self, texts: &'_ [(Vec2, &'_ [String])]) -> usize {
-        let new_offset = self.text_data.laid_out_lines.len();
 
-        {
-            let mut cur_offset = new_offset;
-            for (pos, texts) in texts {
-                self.text_data.columns.push(Column {
-                    pos: *pos,
-                    length: texts.len(),
-                    offset: cur_offset,
-                });
-                cur_offset += texts.len();
-                self.text_data.laid_out_lines.extend(
-                    texts
-                        .iter()
-                        .map(|text| layout(text, &mut self.text_component)),
-                );
-            }
-        }
-        let col_id = self.text_data.columns.len() - 1;
-
-        let incomplete_atlas = self.text_data.laid_out_lines[new_offset..]
+    pub fn bind_text(&mut self, offset: usize, length: usize) {
+        let incomplete_atlas = self.text_data.laid_out_lines[offset..offset + length]
             .iter()
             .flat_map(glyphs)
             .any(|glyph| {
@@ -397,8 +377,9 @@ impl Stage {
                 let a_id = atlas.id;
                 let a_w = atlas.width;
                 let a_h = atlas.height;
-                self.text_data.bound_lines.extend(
-                    self.text_data.laid_out_lines[new_offset..]
+                self.text_data.bound_lines.splice(
+                    offset..min(offset + length, self.text_data.bound_lines.len()),
+                    self.text_data.laid_out_lines[offset..offset + length]
                         .iter()
                         .map(|buffer_line| {
                             TextLine::new(
@@ -413,11 +394,45 @@ impl Stage {
                 );
             }
         };
+    }
+
+    // not a str because the bufferline owns them. maybe better to copy inside somewhere?
+    pub fn insert_text(&mut self, batches: &'_ [(Vec2, &'_ [String])]) -> usize {
+        let new_offset = self.text_data.laid_out_lines.len();
+        let mut new_size = 0;
+
+        {
+            let mut cur_offset = new_offset;
+            for (pos, texts) in batches {
+                self.text_data.columns.push(Column {
+                    pos: *pos,
+                    length: texts.len(),
+                    offset: cur_offset,
+                });
+                cur_offset += texts.len();
+                new_size += texts.len();
+                self.text_data.laid_out_lines.extend(
+                    texts
+                        .iter()
+                        .map(|text| layout(text, &mut self.text_component)),
+                );
+            }
+        }
+        let col_id = self.text_data.columns.len() - 1;
+        self.bind_text(new_offset, new_size);
         col_id
     }
 
-    pub fn replace_text(&mut self, col_id: usize, text: &'_ [String]) {
-        assert!(self.text_data.columns[col_id].length == text.len());
+    pub fn replace_text(&mut self, col_id: usize, texts: &'_ [String]) {
+        let col = &self.text_data.columns[col_id];
+        assert!(col.length == texts.len());
+        self.text_data.laid_out_lines.splice(
+            col.offset..col.offset + col.length,
+            texts
+                .iter()
+                .map(|text| layout(text, &mut self.text_component)),
+        );
+        self.bind_text(col.offset, col.length);
     }
 }
 
@@ -603,12 +618,16 @@ fn main() {
                 ),
                 (
                     Vec2 { x: 200.0, y: 200.0 },
-                    vec![String::from(
-                        "________________________________________🐧🐧🐧 Why is this so nice?",
-                    )]
-                    .as_slice(),
+                    vec![String::from("Old value.")].as_slice(),
                 ),
             ]);
+            stage.replace_text(
+                1,
+                vec![String::from(
+                    "________________________________________🐧🐧🐧 New value!",
+                )]
+                .as_slice(),
+            );
             stage
         })
     });
