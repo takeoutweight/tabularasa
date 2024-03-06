@@ -25,8 +25,15 @@ struct Vertex {
     uv: Vec2,
 }
 
+struct Animating {
+    prev_pos: Vec2,
+    duration: f32,
+    start_time: f64,
+}
+
 struct Column {
     pos: Vec2,
+    animation: Option<Animating>,
     offset: usize,
     length: usize,
 }
@@ -406,6 +413,7 @@ impl Stage {
             for (pos, texts) in batches {
                 self.text_data.columns.push(Column {
                     pos: *pos,
+                    animation: None,
                     length: texts.len(),
                     offset: cur_offset,
                 });
@@ -526,6 +534,26 @@ impl Stage {
 
 const LINE_HEIGHT: f32 = 80.0;
 
+impl Column {
+    fn cur_pos(&self, at_time: f64) -> Vec2 {
+        match &self.animation {
+            Some(anim) => {
+                if at_time <= anim.start_time {
+                    anim.prev_pos
+                } else if at_time >= anim.start_time + anim.duration as f64 {
+                    self.pos
+                } else {
+                    let t = (at_time - anim.start_time) as f32 / anim.duration;
+                    let x = (1.0 - t) * anim.prev_pos.x + t * self.pos.x;
+                    let y = (1.0 - t) * anim.prev_pos.y + t * self.pos.y;
+                    Vec2 { x, y }
+                }
+            }
+            None => self.pos,
+        }
+    }
+}
+
 fn draw_column(
     text_data: &TextData,
     window_width: f32,
@@ -554,7 +582,7 @@ impl EventHandler for Stage {
         }
         // self.draws_remaining -= 1;
 
-        // let t = date::now();
+        let t = date::now();
 
         self.ctx.begin_default_pass(Default::default());
 
@@ -576,6 +604,34 @@ impl EventHandler for Stage {
     fn resize_event(&mut self, w: f32, h: f32) {
         self.window_width = w;
         self.window_height = h;
+    }
+
+    fn key_down_event(&mut self, keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {
+        match keycode {
+            KeyCode::Up => {
+                let t = date::now();
+                if self.text_data.columns.len() > 0 {
+                    self.text_data.columns[0].animation = Some(Animating {
+                        prev_pos: self.text_data.columns[0].cur_pos(t),
+                        duration: 0.5,
+                        start_time: t,
+                    });
+                    self.text_data.columns[0].pos.y -= 50.0;
+                }
+            }
+            KeyCode::Down => {
+                let t = date::now();
+                if self.text_data.columns.len() > 0 {
+                    self.text_data.columns[0].animation = Some(Animating {
+                        prev_pos: self.text_data.columns[0].cur_pos(t),
+                        duration: 0.5,
+                        start_time: t,
+                    });
+                    self.text_data.columns[0].pos.y += 50.0;
+                }
+            }
+            _ => {}
+        }
     }
 }
 
