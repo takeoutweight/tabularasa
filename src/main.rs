@@ -560,12 +560,14 @@ fn draw_column(
     window_height: f32,
     ctx: &mut Box<dyn RenderingBackend>,
     column: &Column,
+    at_time: f64,
 ) {
-    let mut cur_y = column.pos.y;
+    let pos = column.cur_pos(at_time);
+    let mut cur_y = pos.y;
     for text_line in text_data.bound_lines[column.offset..column.offset + column.length].iter() {
         ctx.apply_bindings(&text_line.bindings);
         ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms {
-            offset: (column.pos.x, cur_y),
+            offset: (pos.x, cur_y),
             window_scale: (1.0 / window_width.max(0.1), -1.0 / window_height.max(0.1)),
         }));
         ctx.draw(0, text_line.index_count, 1);
@@ -594,6 +596,7 @@ impl EventHandler for Stage {
                 self.window_height,
                 &mut self.ctx,
                 column,
+                t
             );
         }
         self.ctx.end_render_pass();
@@ -613,7 +616,7 @@ impl EventHandler for Stage {
                 if self.text_data.columns.len() > 0 {
                     self.text_data.columns[0].animation = Some(Animating {
                         prev_pos: self.text_data.columns[0].cur_pos(t),
-                        duration: 0.5,
+                        duration: 0.1,
                         start_time: t,
                     });
                     self.text_data.columns[0].pos.y -= 50.0;
@@ -624,7 +627,7 @@ impl EventHandler for Stage {
                 if self.text_data.columns.len() > 0 {
                     self.text_data.columns[0].animation = Some(Animating {
                         prev_pos: self.text_data.columns[0].cur_pos(t),
-                        duration: 0.5,
+                        duration: 0.1,
                         start_time: t,
                     });
                     self.text_data.columns[0].pos.y += 50.0;
