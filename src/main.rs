@@ -31,9 +31,16 @@ struct Animating {
     start_time: f64,
 }
 
+#[derive(Copy, Clone)]
+struct Clip {
+    pos: Vec2,
+    size: Vec2,
+}
+
 struct Column {
     pos: Vec2,
     animation: Option<Animating>,
+    clip: Option<Clip>,
     offset: usize,
     length: usize,
 }
@@ -404,16 +411,17 @@ impl Stage {
     }
 
     // not a str because the bufferline owns them. maybe better to copy inside somewhere?
-    pub fn insert_text(&mut self, batches: &'_ [(Vec2, &'_ [String])]) -> usize {
+    pub fn insert_text(&mut self, batches: &'_ [(Vec2, Option<Clip>, &'_ [String])]) -> usize {
         let new_offset = self.text_data.laid_out_lines.len();
         let mut new_size = 0;
 
         {
             let mut cur_offset = new_offset;
-            for (pos, texts) in batches {
+            for (pos, clip, texts) in batches {
                 self.text_data.columns.push(Column {
                     pos: *pos,
                     animation: None,
+                    clip: *clip,
                     length: texts.len(),
                     offset: cur_offset,
                 });
@@ -562,6 +570,19 @@ fn draw_column(
     column: &Column,
     at_time: f64,
 ) {
+    match column.clip {
+        Some(clip) => {
+            ctx.apply_scissor_rect(
+                //  TODO This bakes in the x2 retina pixel coordinate discrpancy.
+                // I.e. We're specifying clip in halved coordinates.
+                (clip.pos.x * 2.0) as i32,
+                (window_height - (clip.pos.y + clip.size.y) * 2.0) as i32,
+                (clip.size.x * 2.0) as i32,
+                (clip.size.y * 2.0) as i32,
+            );
+        }
+        None => {}
+    }
     let pos = column.cur_pos(at_time);
     let mut cur_y = pos.y;
     for text_line in text_data.bound_lines[column.offset..column.offset + column.length].iter() {
@@ -572,6 +593,12 @@ fn draw_column(
         }));
         ctx.draw(0, text_line.index_count, 1);
         cur_y += LINE_HEIGHT;
+    }
+    match column.clip {
+        Some(_clip) => {
+            ctx.apply_scissor_rect(0, 0, window_width as i32, window_height as i32);
+        }
+        None => {}
     }
 }
 
@@ -596,7 +623,7 @@ impl EventHandler for Stage {
                 self.window_height,
                 &mut self.ctx,
                 column,
-                t
+                t,
             );
         }
         self.ctx.end_render_pass();
@@ -667,16 +694,26 @@ fn main() {
             let mut stage = Stage::new(window_width, window_height);
             stage.insert_text(&vec![
                 (
-                    Vec2 { x: 200.0, y: 200.0 },
+                    Vec2 { x: 180.0, y: 180.0 },
+                    Some(Clip {
+                        pos: Vec2 { x: 90.0, y: 90.0 },
+                        size: Vec2 { x: 100.0, y: 100.0 },
+                    }),
                     vec![
                         String::from("my go Buffered Robin Nola Alden Line"),
                         String::from("A Second Line"),
                         String::from("A Third Line"),
+                        String::from("A Forth Line"),
+                        String::from("A Fifth Line"),
+                        String::from("A Sixth Line"),
+                        String::from("A Seventh Line"),
+                        String::from("A Eighth Line"),
                     ]
                     .as_slice(),
                 ),
                 (
                     Vec2 { x: 200.0, y: 200.0 },
+                    None,
                     vec![String::from("Old value.")].as_slice(),
                 ),
             ]);
