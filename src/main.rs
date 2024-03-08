@@ -573,12 +573,11 @@ fn draw_column(
     match column.clip {
         Some(clip) => {
             ctx.apply_scissor_rect(
-                //  TODO This bakes in the x2 retina pixel coordinate discrpancy.
-                // I.e. We're specifying clip in halved coordinates.
-                (clip.pos.x * 2.0) as i32,
-                (window_height - (clip.pos.y + clip.size.y) * 2.0) as i32,
-                (clip.size.x * 2.0) as i32,
-                (clip.size.y * 2.0) as i32,
+                // This is in "real" pixels i.e. not the halved coarse pixels as reported by eg screen shot tool
+                clip.pos.x as i32,
+                (window_height - (clip.pos.y + clip.size.y)) as i32,
+                clip.size.x as i32,
+                clip.size.y as i32,
             );
         }
         None => {}
@@ -589,7 +588,7 @@ fn draw_column(
         ctx.apply_bindings(&text_line.bindings);
         ctx.apply_uniforms(UniformsSource::table(&shader::Uniforms {
             offset: (pos.x, cur_y),
-            window_scale: (1.0 / window_width.max(0.1), -1.0 / window_height.max(0.1)),
+            window_scale: (2.0 / window_width.max(0.1), -2.0 / window_height.max(0.1)),
         }));
         ctx.draw(0, text_line.index_count, 1);
         cur_y += LINE_HEIGHT;
@@ -694,10 +693,10 @@ fn main() {
             let mut stage = Stage::new(window_width, window_height);
             stage.insert_text(&vec![
                 (
-                    Vec2 { x: 180.0, y: 180.0 },
+                    Vec2 { x: 100.0, y: 100.0 },
                     Some(Clip {
-                        pos: Vec2 { x: 90.0, y: 90.0 },
-                        size: Vec2 { x: 100.0, y: 100.0 },
+                        pos: Vec2 { x: 108.0, y: 100.0 },
+                        size: Vec2 { x: 560.0, y: 560.0 },
                     }),
                     vec![
                         String::from("my go Buffered Robin Nola Alden Line"),
