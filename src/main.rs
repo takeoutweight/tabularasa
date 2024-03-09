@@ -297,9 +297,9 @@ impl Stage {
                                     (rect.y + y) * ATLAS_WIDTH * 4 + ((rect.x + x) * 4),
                                 )
                                 .unwrap();
-                                atlas_texture[target + 0] = 0xff; // r
-                                atlas_texture[target + 1] = 0xff;
-                                atlas_texture[target + 2] = 0xff;
+                                atlas_texture[target + 0] = TEXT_R; // r
+                                atlas_texture[target + 1] = TEXT_G;
+                                atlas_texture[target + 2] = TEXT_B;
                                 // a
                                 atlas_texture[target + 3] =
                                     img.data[usize::try_from(y * w + x).unwrap()];
@@ -464,6 +464,10 @@ struct Stage {
 
 // in texels I.e. not bit array u8 length.
 const ATLAS_WIDTH: u32 = 100;
+const BACKGROUND_COLOR : (f32, f32, f32, f32) = (1.0,0.9, 0.9, 1.0);
+const TEXT_R: u8 = 0x10;
+const TEXT_G: u8 = 0x10;
+const TEXT_B: u8 = 0x30;
 
 impl Stage {
     pub fn new(window_width: f32, window_height: f32) -> Stage {
@@ -613,6 +617,8 @@ impl EventHandler for Stage {
         let t = date::now();
 
         self.ctx.begin_default_pass(Default::default());
+
+        self.ctx.clear(Some(BACKGROUND_COLOR), None, None);
 
         self.ctx.apply_pipeline(&self.pipeline);
         for column in self.text_data.columns.iter() {
