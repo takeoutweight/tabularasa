@@ -426,28 +426,26 @@ impl Stage {
     }
 
     // not a str because the bufferline owns them. maybe better to copy inside somewhere?
-    pub fn insert_text(&mut self, batches: &'_ [(Vec2, Option<Clip>, &'_ [String])]) -> usize {
+    pub fn insert_text(&mut self, pos: Vec2, clip: Option<Clip>, texts: &'_ [String]) -> usize {
         let new_offset = self.text_data.laid_out_lines.len();
         let mut new_size = 0;
 
         {
             let mut cur_offset = new_offset;
-            for (pos, clip, texts) in batches {
-                self.text_data.columns.push(Column {
-                    pos: *pos,
-                    animation: None,
-                    clip: *clip,
-                    length: texts.len(),
-                    offset: cur_offset,
-                });
-                cur_offset += texts.len();
-                new_size += texts.len();
-                self.text_data.laid_out_lines.extend(
-                    texts
-                        .iter()
-                        .map(|text| layout(text, &mut self.text_component)),
-                );
-            }
+            self.text_data.columns.push(Column {
+                pos,
+                animation: None,
+                clip,
+                length: texts.len(),
+                offset: cur_offset,
+            });
+            cur_offset += texts.len();
+            new_size += texts.len();
+            self.text_data.laid_out_lines.extend(
+                texts
+                    .iter()
+                    .map(|text| layout(text, &mut self.text_component)),
+            );
         }
         let unbound_offset = self.text_data.unbound_laid_out_offset.min(new_offset);
         self.text_data.unbound_laid_out_offset = unbound_offset;
@@ -726,33 +724,30 @@ fn main() {
     miniquad::start(conf, move || {
         Box::new({
             let mut stage = Stage::new(window_width, window_height);
-            stage.insert_text(&vec![
-                (
-                    Vec2 { x: 100.0, y: 100.0 },
-                    Some(Clip {
-                        pos: Vec2 { x: 108.0, y: 100.0 },
-                        size: Vec2 { x: 560.0, y: 560.0 },
-                    }),
-                    vec![
-                        String::from("my go Buffered Robin Nola Alden Line"),
-                        String::from("A Second Line"),
-                        String::from("A Third Line"),
-                        String::from("A Forth Line"),
-                        String::from("A Fifth Line"),
-                        String::from("A Sixth Line"),
-                        String::from("A Seventh Line"),
-                        String::from("A Eighth Line"),
-                    ]
-                    .as_slice(),
-                ),
-                (
-                    Vec2 { x: 200.0, y: 200.0 },
-                    None,
-                    vec![String::from("Old value.")].as_slice(),
-                ),
-            ]);
+            stage.insert_text(
+                Vec2 { x: 100.0, y: 100.0 },
+                Some(Clip {
+                    pos: Vec2 { x: 108.0, y: 100.0 },
+                    size: Vec2 { x: 560.0, y: 560.0 },
+                }),
+                &vec![
+                    String::from("my go Buffered Robin Nola Alden Line"),
+                    String::from("A Second Line"),
+                    String::from("A Third Line"),
+                    String::from("A Forth Line"),
+                    String::from("A Fifth Line"),
+                    String::from("A Sixth Line"),
+                    String::from("A Seventh Line"),
+                    String::from("A Eighth Line"),
+                ],
+            );
+            let col_id = stage.insert_text(
+                Vec2 { x: 200.0, y: 200.0 },
+                None,
+                &vec![String::from("Old value.")],
+            );
             stage.replace_text(
-                1,
+                col_id,
                 vec![String::from("________________🐧🐧🐧 New value!")].as_slice(),
             );
             stage
