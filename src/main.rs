@@ -4,6 +4,7 @@ use cosmic_text::{
 };
 use fontdb::Family;
 use miniquad::*;
+use miniquad::window::quit;
 use texture_packer::packer::{Packer, SkylinePacker};
 use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;
@@ -691,6 +692,9 @@ impl EventHandler for Stage {
                     });
                     self.text_data.columns[0].pos.y += 50.0;
                 }
+            }
+            KeyCode::Q => {
+                window::quit();
             }
             _ => {}
         }
