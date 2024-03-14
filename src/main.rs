@@ -464,7 +464,7 @@ struct Stage {
 
 // in texels I.e. not bit array u8 length.
 const ATLAS_WIDTH: u32 = 100;
-const BACKGROUND_COLOR : (f32, f32, f32, f32) = (1.0,0.9, 0.9, 1.0);
+const BACKGROUND_COLOR: (f32, f32, f32, f32) = (1.0, 0.9, 0.9, 1.0);
 const TEXT_R: u8 = 0x10;
 const TEXT_G: u8 = 0x10;
 const TEXT_B: u8 = 0x30;
@@ -659,7 +659,7 @@ impl EventHandler for Stage {
                 if self.text_data.columns.len() > 0 {
                     self.text_data.columns[0].animation = Some(Animating {
                         prev_pos: self.text_data.columns[0].cur_pos(t),
-                        duration: 0.1,
+                        duration: 1.0,
                         start_time: t,
                     });
                     self.text_data.columns[0].pos.y += 50.0;
@@ -724,10 +724,7 @@ fn main() {
             ]);
             stage.replace_text(
                 1,
-                vec![String::from(
-                    "________________________________________🐧🐧🐧 New value!",
-                )]
-                .as_slice(),
+                vec![String::from("________________🐧🐧🐧 New value!")].as_slice(),
             );
             stage
         })
