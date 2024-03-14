@@ -11,6 +11,7 @@ use texture_packer::TexturePackerConfig;
 // use image_importer::ImageImporter;
 use std::cmp::{max, min};
 use std::collections::HashMap;
+use std::{thread, time};
 use swash::scale::image::Content;
 
 #[repr(C)]
@@ -54,6 +55,8 @@ struct Atlas {
 // combine with TextComponent?
 struct TextData {
     laid_out_lines: Vec<BufferLine>,
+    unbound_laid_out_offset: usize, // todo make a range list
+    unbound_laid_out_length: usize,
     bound_lines: Vec<TextLine>,
     columns: Vec<Column>,
 }
@@ -209,6 +212,13 @@ impl TextLine {
 }
 
 impl Stage {
+    pub fn invalidate_atlas(&mut self) {
+        self.text_component.glyph_loc.clear();
+        if let Some(texture) = &self.text_component.texture_atlas {
+            self.ctx.delete_texture(texture.id)
+        }
+        self.text_component.texture_atlas = None;
+    }
     pub fn regenerate_atlas(&mut self) {
         println!("Regenerating atlas");
         let config = TexturePackerConfig {
@@ -220,8 +230,6 @@ impl Stage {
             ..Default::default()
         };
         let mut packer = SkylinePacker::new(config);
-
-        self.text_component.glyph_loc.clear();
 
         for glyph in self.text_data.laid_out_lines.iter().flat_map(glyphs) {
             let glyph_key = CacheKey {
@@ -333,10 +341,6 @@ impl Stage {
             }
         }
 
-        if let Some(texture) = &self.text_component.texture_atlas {
-            self.ctx.delete_texture(texture.id)
-        }
-
         let a_height_u =
             u16::try_from(u32::try_from(atlas_texture.len()).unwrap() / (ATLAS_WIDTH * 4)).unwrap();
 
@@ -355,6 +359,13 @@ impl Stage {
             height: a_h,
         };
 
+        assert!(
+            match self.text_component.texture_atlas {
+                None => true,
+                _ => false,
+            },
+            "Atlas regenerated when still valid"
+        );
         self.text_component.texture_atlas = Some(atlas);
         self.text_data.bound_lines.clear();
         self.text_data
@@ -371,7 +382,9 @@ impl Stage {
             }));
     }
 
-    pub fn bind_text(&mut self, offset: usize, length: usize) {
+    pub fn bind_text(&mut self) {
+        let offset = self.text_data.unbound_laid_out_offset;
+        let length = self.text_data.unbound_laid_out_length;
         let incomplete_atlas = self.text_data.laid_out_lines[offset..offset + length]
             .iter()
             .flat_map(glyphs)
@@ -408,6 +421,8 @@ impl Stage {
                 );
             }
         };
+        self.text_data.unbound_laid_out_offset = self.text_data.laid_out_lines.len();
+        self.text_data.unbound_laid_out_length = 0;
     }
 
     // not a str because the bufferline owns them. maybe better to copy inside somewhere?
@@ -434,8 +449,10 @@ impl Stage {
                 );
             }
         }
+        let unbound_offset = self.text_data.unbound_laid_out_offset.min(new_offset);
+        self.text_data.unbound_laid_out_offset = unbound_offset;
+        self.text_data.unbound_laid_out_length = new_offset + new_size - unbound_offset;
         let col_id = self.text_data.columns.len() - 1;
-        self.bind_text(new_offset, new_size);
         col_id
     }
 
@@ -448,7 +465,13 @@ impl Stage {
                 .iter()
                 .map(|text| layout(text, &mut self.text_component)),
         );
-        self.bind_text(col.offset, col.length);
+        let unbound_offset = self.text_data.unbound_laid_out_offset.min(col.offset);
+        let unbound_length = max(
+            col.offset + col.length,
+            self.text_data.unbound_laid_out_offset + self.text_data.unbound_laid_out_length,
+        ) - unbound_offset;
+        self.text_data.unbound_laid_out_offset = unbound_offset;
+        self.text_data.unbound_laid_out_length = unbound_length;
     }
 }
 
@@ -523,10 +546,14 @@ impl Stage {
 
         let text_component = TextComponent::new();
 
+        let unbound_laid_out_offset = 0;
+        let unbound_laid_out_length = 0;
         let laid_out_lines = Vec::new();
         let bound_lines = Vec::new();
         let columns = Vec::new();
         let text_data = TextData {
+            unbound_laid_out_offset,
+            unbound_laid_out_length,
             laid_out_lines,
             bound_lines,
             columns,
@@ -613,6 +640,8 @@ impl EventHandler for Stage {
             return;
         }
         // self.draws_remaining -= 1;
+
+        self.bind_text();
 
         let t = date::now();
 
