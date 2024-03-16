@@ -1,1 +1,3 @@
 /target/
+/lean/.lake
+/lean/a.out
