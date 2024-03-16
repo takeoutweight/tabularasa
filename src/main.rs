@@ -3,8 +3,8 @@ use cosmic_text::{
     SubpixelBin, SwashCache, Wrap,
 };
 use fontdb::Family;
-use miniquad::*;
 use miniquad::window::quit;
+use miniquad::*;
 use texture_packer::packer::{Packer, SkylinePacker};
 use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;

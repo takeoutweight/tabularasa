@@ -1,11 +1,5 @@
-# 2023-09-26 lean4: 4.0.0 -> 4.1.0 #257422 https://github.com/NixOS/nixpkgs/pull/257422
-# (fetchTarball "https://github.com/NixOS/nixpkgs/archive/85e0d60613ee638751089708b8ac77f83b6f37d2.tar.gz")
-{ pkgs ? import (fetchGit {
-                   url = "/Users/nathan/src/nix/nixpkgs";
-									 ref = "takeoutweight/mac-vulkan-validation";
-									 shallow = true;
-                 })
-  {config.allowUnfree = false;}}:
+# nixpkgs-23.11-darwin 2024-03-15 from https://status.nixos.org/
+{ pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/3e6b090c05a4a86e6b9de820f039871ff839d3e7.tar.gz") {}}:
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
