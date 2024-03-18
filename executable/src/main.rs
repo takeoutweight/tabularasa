@@ -59,7 +59,7 @@ extern "C" {
 extern "C" {
     fn initialize_Structural(builtin: u8, io: libc::uintptr_t) -> *mut LeanObject;
     fn leans_answer(unit: libc::uintptr_t) -> u8;
-    fn leans_other_answer() -> u8;
+//    fn leans_other_answer() -> u8;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -794,8 +794,8 @@ fn main() {
 
         let a = leans_answer(LEAN_UNIT);
         println!("Lean's answer: {}", a);
-        let b = leans_other_answer();
-        println!("Lean's other answer: {}", b);
+        // let b = leans_other_answer();
+        // println!("Lean's other answer: {}", b);
     }
 
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
