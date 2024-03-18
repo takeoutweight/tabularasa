@@ -12,7 +12,7 @@ use texture_packer::TexturePackerConfig;
 // use image_importer::ImageImporter;
 use std::cmp::{max, min};
 use std::collections::HashMap;
-use std::{thread, time};
+use std::{mem, thread, time};
 use swash::scale::image::Content;
 
 #[repr(C)]
@@ -35,19 +35,31 @@ struct LeanObject {
     m_tag: libc::c_uchar,
 }
 
-const LEAN_UNIT: libc::uintptr_t = 0 << 1 | 1;
+#[repr(C)]
+pub struct LeanOKCtor {
+    m_header: LeanObject,
+    m_objs_0: u8,
+    m_objs_1: libc::uintptr_t,
+}
+
+const LEAN_UNIT: libc::uintptr_t = (0 << 1) | 1;
 
 #[link(name = "leanshared")]
 extern "C" {
     fn lean_initialize_runtime_module();
+    fn lean_init_task_manager(); // for Task
+    fn lean_initialize_thread();
+    fn lean_finalize_thread();
     fn lean_io_mark_end_initialization();
     fn lean_io_result_show_error(o: *mut LeanObject);
     fn lean_dec_ref_cold(o: *mut LeanObject);
+    fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut LeanOKCtor; // libc::c_void;
 }
 #[link(name = "Structural-1")]
 extern "C" {
     fn initialize_Structural(builtin: u8, io: libc::uintptr_t) -> *mut LeanObject;
     fn leans_answer(unit: libc::uintptr_t) -> u8;
+    fn leans_other_answer() -> u8;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -58,6 +70,27 @@ fn lean_dec_ref(o: *mut LeanObject) {
             lean_dec_ref_cold(o);
         }
     }
+}
+
+#[no_mangle]
+pub extern "C" fn lean_io_result_mk_ok() -> *mut LeanOKCtor {
+    unsafe {
+        let m = lean_alloc_small(
+            (6) * u8::try_from(mem::size_of::<u8>()).unwrap(),
+            (24 / 8) - 1,
+        );
+        (*m).m_header.m_rc = 1;
+        (*m).m_header.m_tag = 0;
+        (*m).m_header.m_other = 2;
+        (*m).m_header.m_cs_sz = 0;
+        (*m).m_objs_0 = 49;
+        (*m).m_objs_1 = LEAN_UNIT;
+        m
+    }
+}
+
+fn rusts_answer() -> *mut LeanOKCtor {
+    lean_io_result_mk_ok()
 }
 
 struct Animating {
@@ -751,15 +784,21 @@ fn main() {
         let res = initialize_Structural(1, LEAN_UNIT);
         if (*res).m_tag == 0 {
             lean_dec_ref(res);
-            let a = leans_answer(LEAN_UNIT);
-            println!("Lean's answer: {}", a);
         } else {
             println!("failed to load lean: {:?}", res);
             lean_io_result_show_error(res);
             lean_dec_ref(res);
+            return;
         }
         lean_io_mark_end_initialization();
+
+        let a = leans_answer(LEAN_UNIT);
+        println!("Lean's answer: {}", a);
+        let b = leans_other_answer();
+        println!("Lean's other answer: {}", b);
     }
+
+    println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
 
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
