@@ -27,6 +27,39 @@ struct Vertex {
     uv: Vec2,
 }
 
+#[repr(C)]
+struct LeanObject {
+    m_rc: libc::c_int,
+    m_cs_sz: libc::c_ushort,
+    m_other: libc::c_uchar,
+    m_tag: libc::c_uchar,
+}
+
+const LEAN_UNIT: libc::uintptr_t = 0 << 1 | 1;
+
+#[link(name = "leanshared")]
+extern "C" {
+    fn lean_initialize_runtime_module();
+    fn lean_io_mark_end_initialization();
+    fn lean_io_result_show_error(o: *mut LeanObject);
+    fn lean_dec_ref_cold(o: *mut LeanObject);
+}
+#[link(name = "Structural-1")]
+extern "C" {
+    fn initialize_Structural(builtin: u8, io: libc::uintptr_t) -> *mut LeanObject;
+    fn leans_answer(unit: libc::uintptr_t) -> u8;
+}
+
+fn lean_dec_ref(o: *mut LeanObject) {
+    unsafe {
+        if (*o).m_rc > 1 {
+            (*o).m_rc -= 1;
+        } else if (*o).m_rc != 0 {
+            lean_dec_ref_cold(o);
+        }
+    }
+}
+
 struct Animating {
     prev_pos: Vec2,
     duration: f32,
@@ -713,6 +746,21 @@ fn draw_rect(arr: &mut [u8; 400 * 200 * 4], x: usize, y: usize, w: usize, h: usi
 }
 
 fn main() {
+    unsafe {
+        lean_initialize_runtime_module();
+        let res = initialize_Structural(1, LEAN_UNIT);
+        if (*res).m_tag == 0 {
+            lean_dec_ref(res);
+            let a = leans_answer(LEAN_UNIT);
+            println!("Lean's answer: {}", a);
+        } else {
+            println!("failed to load lean: {:?}", res);
+            lean_io_result_show_error(res);
+            lean_dec_ref(res);
+        }
+        lean_io_mark_end_initialization();
+    }
+
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
     conf.platform.apple_gfx_api = if metal {
