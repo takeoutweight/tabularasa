@@ -1,0 +1,21 @@
+[package]
+name = "tabularasa_drawing"
+version = "0.1.0"
+edition = "2021"
+authors = [
+]
+publish = false
+
+[dependencies]
+miniquad = { path = "../../../rust/miniquad"}
+# miniquad = "0.4.0-alpha.10"
+swash = "0.1.8"
+cosmic-text = "0.10.0"
+fontdb = "0.15.0"
+texture_packer = { path = "../../../rust/texture_packer"} # "0.25.0"
+libc = "0.2"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+name = "tabularasa_drawing"
+path = "src/drawing.rs"

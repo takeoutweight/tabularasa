@@ -42,6 +42,14 @@ pub struct LeanOKCtor {
     m_objs_1: libc::uintptr_t,
 }
 
+#[repr(C)]
+pub struct LeanClosure {
+    m_header: LeanObject,
+    m_fun: extern "C" fn(u8) -> u8,
+    m_arity: u16,
+    m_num_fixed: u16,
+}
+
 const LEAN_UNIT: libc::uintptr_t = (0 << 1) | 1;
 
 #[link(name = "leanshared")]
@@ -53,13 +61,16 @@ extern "C" {
     fn lean_io_mark_end_initialization();
     fn lean_io_result_show_error(o: *mut LeanObject);
     fn lean_dec_ref_cold(o: *mut LeanObject);
-    fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut LeanOKCtor; // libc::c_void;
+    fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut libc::c_void;// LeanOKCtor; // 
 }
-#[link(name = "Structural-1")]
+
+// #[link(name = "Structural-1")]
+#[link(name = "Structural")]
 extern "C" {
     fn initialize_Structural(builtin: u8, io: libc::uintptr_t) -> *mut LeanObject;
     fn leans_answer(unit: libc::uintptr_t) -> u8;
-//    fn leans_other_answer() -> u8;
+    fn leans_other_answer(_: u8) -> u8;
+    fn lean_use_callback(a: *mut LeanClosure) -> u8;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -72,13 +83,33 @@ fn lean_dec_ref(o: *mut LeanObject) {
     }
 }
 
+extern "C" fn rust_callback(a: u8) -> u8 {
+    let unboxed = a >> 1;
+    println!("I'm being called with {} = {}", a, unboxed);
+    unboxed + 7
+}
+
+fn mk_closure() -> *mut LeanClosure {
+    unsafe {
+        let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanClosure;
+        (*m).m_header.m_rc = 1;
+        (*m).m_header.m_tag = 245; // LeanClosure
+        (*m).m_header.m_other = 0;
+        (*m).m_header.m_cs_sz = 0;
+        (*m).m_fun = rust_callback;
+        (*m).m_arity = 1;
+        (*m).m_num_fixed = 0;
+        m
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn lean_io_result_mk_ok() -> *mut LeanOKCtor {
     unsafe {
         let m = lean_alloc_small(
             (6) * u8::try_from(mem::size_of::<u8>()).unwrap(),
             (24 / 8) - 1,
-        );
+        ) as *mut LeanOKCtor;
         (*m).m_header.m_rc = 1;
         (*m).m_header.m_tag = 0;
         (*m).m_header.m_other = 2;
@@ -89,7 +120,8 @@ pub extern "C" fn lean_io_result_mk_ok() -> *mut LeanOKCtor {
     }
 }
 
-fn rusts_answer() -> *mut LeanOKCtor {
+#[no_mangle]
+pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
     lean_io_result_mk_ok()
 }
 
@@ -794,11 +826,15 @@ fn main() {
 
         let a = leans_answer(LEAN_UNIT);
         println!("Lean's answer: {}", a);
-        // let b = leans_other_answer();
+        // let b = leans_other_answer(12);
         // println!("Lean's other answer: {}", b);
+        let cb = mk_closure();
+        let r = lean_use_callback(cb);
+        println!("Lean's callback: {}", r);
     }
 
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
+    println!("size of LEANClosure {}", mem::size_of::<LeanClosure>());
 
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
