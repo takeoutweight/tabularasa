@@ -50,6 +50,14 @@ pub struct LeanClosure {
     m_num_fixed: u16,
 }
 
+#[repr(C)]
+pub struct LeanIOClosure {
+    m_header: LeanObject,
+    m_fun: extern "C" fn(*mut LeanObject, *mut LeanObject) -> *mut LeanOKCtor,
+    m_arity: u16,
+    m_num_fixed: u16,
+}
+
 const LEAN_UNIT: libc::uintptr_t = (0 << 1) | 1;
 
 #[link(name = "leanshared")]
@@ -71,6 +79,7 @@ extern "C" {
     fn leans_answer(unit: libc::uintptr_t) -> u8;
     fn leans_other_answer(_: u8) -> u8;
     fn lean_use_callback(a: *mut LeanClosure) -> u8;
+    fn lean_use_io_callback(a: *mut LeanIOClosure) -> *mut LeanObject;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -103,26 +112,46 @@ fn mk_closure() -> *mut LeanClosure {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn lean_io_result_mk_ok() -> *mut LeanOKCtor {
+extern "C" fn rust_io_callback(a: *mut LeanObject, _io: *mut LeanObject) -> *mut LeanOKCtor {
+    let unboxed = a as u8 >> 1;
+    println!("I'm io called with {}", unboxed);
+    lean_io_result_mk_ok(unboxed + 8)
+}
+
+fn mk_io_closure() -> *mut LeanIOClosure {
+    unsafe {
+        let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanIOClosure;
+        (*m).m_header.m_rc = 1;
+        (*m).m_header.m_tag = 245; // LeanClosure
+        (*m).m_header.m_other = 0;
+        (*m).m_header.m_cs_sz = 0;
+        (*m).m_fun = rust_io_callback;
+        (*m).m_arity = 2;
+        (*m).m_num_fixed = 0;
+        m
+    }
+}
+
+fn lean_io_result_mk_ok(res: u8) -> *mut LeanOKCtor {
     unsafe {
         let m = lean_alloc_small(
-            (6) * u8::try_from(mem::size_of::<u8>()).unwrap(),
+            24,
             (24 / 8) - 1,
         ) as *mut LeanOKCtor;
         (*m).m_header.m_rc = 1;
         (*m).m_header.m_tag = 0;
         (*m).m_header.m_other = 2;
         (*m).m_header.m_cs_sz = 0;
-        (*m).m_objs_0 = 49;
+        (*m).m_objs_0 = (res << 1) | 1;
         (*m).m_objs_1 = LEAN_UNIT;
+        println!("got here in mk_ok");
         m
     }
 }
 
 #[no_mangle]
 pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
-    lean_io_result_mk_ok()
+    lean_io_result_mk_ok(90)
 }
 
 struct Animating {
@@ -831,6 +860,10 @@ fn main() {
         let cb = mk_closure();
         let r = lean_use_callback(cb);
         println!("Lean's callback: {}", r);
+
+        let cbio = mk_io_closure();
+        let r2 = lean_use_io_callback(cbio) as *mut LeanOKCtor; // todo case check?
+        println!("Lean's io callback: {}", (*r2).m_objs_0 >> 1); // toodo unwrap
     }
 
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
