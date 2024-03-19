@@ -17,7 +17,11 @@ def leanUseCallback (a : UInt8 -> UInt8) : UInt8 := a 60
 def leanIOTest (a : UInt8) : IO UInt8 := pure a
 
 @[export lean_use_io_callback]
-def leanUseIOCallback (a : UInt8 -> IO UInt8) : IO UInt8 := a 70
+def leanUseIOCallback (a : UInt8 -> IO UInt8) : IO UInt8 := do
+  IO.println "printing from Lean's io"
+  let r <- a 70
+  IO.println s!"Lean's io saw: {r}"
+  return r
 
 -- @[extern "rusts_answer"]
 -- opaque rustsAnswer : IO UInt8
