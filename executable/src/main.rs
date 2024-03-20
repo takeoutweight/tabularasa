@@ -176,10 +176,11 @@ extern "C" fn rust_io_string_callback(
     let ls = a as *mut LeanString;
     let string = str_from_lean(ls);
     println!("I'm io string called with {}", string);
+    let out = format!("{string} but from rust 🦀");
     unsafe {
         println!("FYI the refcount is: {}", (*a).m_rc);
         lean_dec_ref(a);
-        lean_io_result_mk_string_ok("from rust 🦀")
+        lean_io_result_mk_string_ok(out.as_str())
     }
 }
 
@@ -225,7 +226,7 @@ fn lean_io_result_mk_string_ok(string: &str) -> *mut LeanOKStringCtor {
     }
 }
 
-// copies the string to Lean's memory. uses nonverlapping so can't copy from that same string
+// copies the string to Lean's memory.
 fn mk_lean_string(string: &str) -> *mut LeanString {
     let cstring = ffi::CString::new(string.to_string()).unwrap();
     let num_bytes = cstring.to_bytes_with_nul().len();
@@ -963,6 +964,7 @@ fn main() {
         let cbio = mk_io_closure();
         let r2 = lean_use_io_callback(cbio) as *mut LeanOKCtor; // todo case check?
         println!("Lean's io callback: {}", (*r2).m_objs_0 >> 1); // toodo unwrap
+        lean_dec_ref(r2 as *mut LeanObject);
 
         let cbios = mk_io_string_closure();
         let r3 = lean_use_io_string_callback(cbios) as *mut LeanOKStringCtor;
@@ -972,7 +974,7 @@ fn main() {
             (*r3).m_header.m_rc,
             (*(*r3).m_objs_0).m_header.m_rc
         );
-        // dec refcount of r3 here?
+        lean_dec_ref(r3 as *mut LeanObject);
     }
 
     let mut conf = conf::Conf::default();
