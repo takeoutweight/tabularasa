@@ -26,8 +26,10 @@ def leanUseIOCallback (a : UInt8 -> IO UInt8) : IO UInt8 := do
 @[export lean_use_io_string_callback]
 def leanUseIOStringCallback (a : String -> IO UInt8) : IO UInt8 := do
   IO.println "printing from Lean's string io"
-  let r <- a "world!!!!Ø"
+  let str := "world!!!!" ++ "ØØØ"
+  let r <- a str
   IO.println s!"Lean's string io saw: {r}"
+  IO.println s!"And just reffering to str after callback: {str}"
   return r + 4
 
 -- @[extern "rusts_answer"]

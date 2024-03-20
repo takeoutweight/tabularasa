@@ -13,7 +13,7 @@ use texture_packer::TexturePackerConfig;
 use memoffset::raw_field;
 use std::cmp::{max, min};
 use std::collections::HashMap;
-use std::{ffi, mem, slice, thread, time};
+use std::{ffi, mem, slice, thread, time, str};
 use swash::scale::image::Content;
 
 #[repr(C)]
@@ -153,6 +153,8 @@ extern "C" fn rust_io_string_callback(a: *mut LeanObject, _io: *mut LeanObject) 
             "I'm io string called with {}",
             str::from_utf8_unchecked(cstr.to_bytes())
         );
+        println!("FYI the refcount is: {}", (*a).m_rc);
+        // lean_dec_ref(a); // the refcount is 0 before this call so I'm not sure I understand what needs to be dec'd.
         lean_io_result_mk_ok(90)
     }
 }
