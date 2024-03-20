@@ -23,6 +23,13 @@ def leanUseIOCallback (a : UInt8 -> IO UInt8) : IO UInt8 := do
   IO.println s!"Lean's io saw: {r}"
   return r
 
+@[export lean_use_io_string_callback]
+def leanUseIOStringCallback (a : String -> IO UInt8) : IO UInt8 := do
+  IO.println "printing from Lean's string io"
+  let r <- a "world!!!!Ø"
+  IO.println s!"Lean's string io saw: {r}"
+  return r + 4
+
 -- @[extern "rusts_answer"]
 -- opaque rustsAnswer : IO UInt8
 

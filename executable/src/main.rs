@@ -10,9 +10,10 @@ use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
+use memoffset::raw_field;
 use std::cmp::{max, min};
 use std::collections::HashMap;
-use std::{mem, thread, time};
+use std::{ffi, mem, slice, thread, time};
 use swash::scale::image::Content;
 
 #[repr(C)]
@@ -33,6 +34,15 @@ struct LeanObject {
     m_cs_sz: libc::c_ushort,
     m_other: libc::c_uchar,
     m_tag: libc::c_uchar,
+}
+
+#[repr(C)]
+struct LeanString {
+    m_header: LeanObject,
+    m_size: usize,
+    m_capacity: usize,
+    m_length: usize,
+    m_data: [libc::c_char; 0],
 }
 
 #[repr(C)]
@@ -69,7 +79,7 @@ extern "C" {
     fn lean_io_mark_end_initialization();
     fn lean_io_result_show_error(o: *mut LeanObject);
     fn lean_dec_ref_cold(o: *mut LeanObject);
-    fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut libc::c_void;// LeanOKCtor; // 
+    fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut libc::c_void; // LeanOKCtor; //
 }
 
 // #[link(name = "Structural-1")]
@@ -80,6 +90,7 @@ extern "C" {
     fn leans_other_answer(_: u8) -> u8;
     fn lean_use_callback(a: *mut LeanClosure) -> u8;
     fn lean_use_io_callback(a: *mut LeanIOClosure) -> *mut LeanObject;
+    fn lean_use_io_string_callback(a: *mut LeanIOClosure) -> *mut LeanObject;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -132,12 +143,34 @@ fn mk_io_closure() -> *mut LeanIOClosure {
     }
 }
 
+extern "C" fn rust_io_string_callback(a: *mut LeanObject, _io: *mut LeanObject) -> *mut LeanOKCtor {
+    let ls = a as *mut LeanString;
+    let ptr = raw_field!(ls, LeanString, m_data) as *const u8;
+    unsafe {
+        let slice: &[u8] = slice::from_raw_parts(ptr, (*ls).m_size);
+        let cstr = ffi::CStr::from_bytes_with_nul_unchecked(slice);
+        println!("I'm io string called with {}", cstr.to_str().unwrap());
+        lean_io_result_mk_ok(90)
+    }
+}
+
+fn mk_io_string_closure() -> *mut LeanIOClosure {
+    unsafe {
+        let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanIOClosure;
+        (*m).m_header.m_rc = 1;
+        (*m).m_header.m_tag = 245; // LeanClosure
+        (*m).m_header.m_other = 0;
+        (*m).m_header.m_cs_sz = 0;
+        (*m).m_fun = rust_io_string_callback;
+        (*m).m_arity = 2;
+        (*m).m_num_fixed = 0;
+        m
+    }
+}
+
 fn lean_io_result_mk_ok(res: u8) -> *mut LeanOKCtor {
     unsafe {
-        let m = lean_alloc_small(
-            24,
-            (24 / 8) - 1,
-        ) as *mut LeanOKCtor;
+        let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanOKCtor;
         (*m).m_header.m_rc = 1;
         (*m).m_header.m_tag = 0;
         (*m).m_header.m_other = 2;
@@ -864,6 +897,10 @@ fn main() {
         let cbio = mk_io_closure();
         let r2 = lean_use_io_callback(cbio) as *mut LeanOKCtor; // todo case check?
         println!("Lean's io callback: {}", (*r2).m_objs_0 >> 1); // toodo unwrap
+
+        let cbios = mk_io_string_closure();
+        let r3 = lean_use_io_string_callback(cbios) as *mut LeanOKCtor;
+        println!("Lean's io string: {}", (*r3).m_objs_0 >> 1); // toodo unwrap
     }
 
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
