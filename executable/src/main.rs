@@ -149,7 +149,10 @@ extern "C" fn rust_io_string_callback(a: *mut LeanObject, _io: *mut LeanObject) 
     unsafe {
         let slice: &[u8] = slice::from_raw_parts(ptr, (*ls).m_size);
         let cstr = ffi::CStr::from_bytes_with_nul_unchecked(slice);
-        println!("I'm io string called with {}", cstr.to_str().unwrap());
+        println!(
+            "I'm io string called with {}",
+            str::from_utf8_unchecked(cstr.to_bytes())
+        );
         lean_io_result_mk_ok(90)
     }
 }
