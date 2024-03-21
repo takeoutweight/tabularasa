@@ -1,5 +1,5 @@
 use memoffset::raw_field;
-use std::{mem, ffi, ptr, slice, str};
+use std::{ffi, mem, ptr, slice, str};
 
 #[repr(C)]
 struct LeanObject {
