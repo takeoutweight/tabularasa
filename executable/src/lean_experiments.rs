@@ -1,6 +1,8 @@
 use memoffset::raw_field;
 use std::{ffi, mem, ptr, slice, str};
 
+mod gui_api;
+
 #[repr(C)]
 struct LeanObject {
     m_rc: libc::c_int,
@@ -56,6 +58,14 @@ pub struct LeanIOStringClosure {
     m_num_fixed: u16,
 }
 
+#[repr(C)]
+pub struct LeanOnEventClosure {
+    m_header: LeanObject,
+    m_fun: extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor,
+    m_arity: u16,
+    m_num_fixed: u16,
+}
+
 const LEAN_UNIT: libc::uintptr_t = (0 << 1) | 1;
 
 #[link(name = "leanshared")]
@@ -67,7 +77,7 @@ extern "C" {
     fn lean_io_mark_end_initialization();
     fn lean_io_result_show_error(o: *mut LeanObject);
     fn lean_dec_ref_cold(o: *mut LeanObject);
-    fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut libc::c_void;
+    pub fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut libc::c_void;
     fn lean_alloc_object(sz: usize) -> *mut libc::c_void;
 }
 
@@ -172,7 +182,7 @@ fn mk_io_string_closure() -> *mut LeanIOStringClosure {
     }
 }
 
-fn lean_io_result_mk_ok(res: u8) -> *mut LeanOKCtor {
+pub fn lean_io_result_mk_ok(res: u8) -> *mut LeanOKCtor {
     unsafe {
         let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanOKCtor;
         (*m).m_header.m_rc = 1;

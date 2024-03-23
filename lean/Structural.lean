@@ -38,4 +38,13 @@ def leanUseIOStringCallback (a : String -> IO String) : IO String := do
 
 -- @[export leans_other_answer]
 -- def leansOtherAnswer : IO UInt8 := rustsAnswer
+inductive Event where
+  | init : Event
+  | alpha_numeric : Event
+  | up : Event
+  | down : Event
 
+def leanUseOnEvent(on_event : Event -> IO Unit) : IO Unit := do
+  on_event Event.down
+  on_event Event.up
+  IO.println "ok, done"
