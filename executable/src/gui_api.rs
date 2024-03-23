@@ -53,7 +53,8 @@ extern "C" fn on_event(interp: &mut Interpreter, evt: u8) {
 
 fn mk_on_event_closure() -> *mut lean_experiments::LeanIOClosure {
     unsafe {
-        let m = lean_experiments::lean_alloc_small(24, (24 / 8) - 1) as *mut lean_experiments::LeanIOClosure;
+        let m = lean_experiments::lean_alloc_small(24, (24 / 8) - 1)
+            as *mut lean_experiments::LeanIOClosure;
         (*m).m_header.m_rc = 1;
         (*m).m_header.m_tag = 245; // LeanClosure
         (*m).m_header.m_other = 0;

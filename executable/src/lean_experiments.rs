@@ -58,6 +58,22 @@ pub struct LeanIOStringClosure {
     m_num_fixed: u16,
 }
 
+type FinalizeProc = extern "C" fn(*mut libc::c_void);
+type ForeachProc = extern "C" fn(*mut libc::c_void, *mut LeanObject);
+
+#[repr(C)]
+pub struct LeanExternalClass {
+    m_finalize: FinalizeProc,
+    m_foreach: ForeachProc,
+}
+
+#[repr(C)]
+pub struct LeanExternalObject {
+    m_header: LeanObject,
+    m_class: *mut LeanExternalClass,
+    m_data: *mut libc::c_void,
+}
+
 #[repr(C)]
 pub struct LeanOnEventClosure {
     m_header: LeanObject,
@@ -79,6 +95,10 @@ extern "C" {
     fn lean_dec_ref_cold(o: *mut LeanObject);
     pub fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut libc::c_void;
     fn lean_alloc_object(sz: usize) -> *mut libc::c_void;
+    pub fn lean_register_external_class(
+        finalize: FinalizeProc,
+        foreach: ForeachProc,
+    ) -> *mut LeanExternalClass;
 }
 
 // #[link(name = "Structural-1")]
@@ -229,6 +249,22 @@ fn mk_lean_string(string: &str) -> *mut LeanString {
     }
 }
 
+fn mk_external_object(
+    cls: *mut LeanExternalClass,
+    data: *mut libc::c_void,
+) -> *mut LeanExternalObject {
+    unsafe {
+        let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanExternalObject;
+        (*m).m_header.m_rc = 1;
+        (*m).m_header.m_tag = 254; // #define LeanExternal    254
+        (*m).m_header.m_other = 0;
+        (*m).m_header.m_cs_sz = 0;
+        (*m).m_class = cls;
+        (*m).m_data = data;
+        m
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
     lean_io_result_mk_ok(90)
@@ -238,6 +274,10 @@ pub fn test_lean() {
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
     println!("size of LEANClosure {}", mem::size_of::<LeanClosure>());
     println!("size of LEANString {}", mem::size_of::<LeanString>());
+    println!(
+        "size of LEANExternal {}",
+        mem::size_of::<LeanExternalObject>()
+    );
 
     unsafe {
         lean_initialize_runtime_module();
@@ -251,6 +291,8 @@ pub fn test_lean() {
             return;
         }
         lean_io_mark_end_initialization();
+
+        gui_api::register_interpreter();
 
         let a = leans_answer(LEAN_UNIT);
         println!("Lean's answer: {}", a);

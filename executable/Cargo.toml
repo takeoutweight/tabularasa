@@ -16,6 +16,7 @@ texture_packer = { path = "../../../rust/texture_packer"} # "0.25.0"
 libc = "0.2"
 memoffset = "0.8"
 num_enum = "0.7.2"
+crossbeam = "0.8.4"
 
 [[bin]]
 name = "tabularasa"
