@@ -1,5 +1,5 @@
 use memoffset::raw_field;
-use std::{ffi, mem, ptr, slice, str};
+use std::{collections::HashMap, ffi, mem, ptr, slice, str};
 
 mod gui_api;
 
@@ -80,6 +80,7 @@ pub struct LeanOnEventClosure {
     m_fun: extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor,
     m_arity: u16,
     m_num_fixed: u16,
+    m_arg: *mut LeanExternalObject,
 }
 
 const LEAN_UNIT: libc::uintptr_t = (0 << 1) | 1;
@@ -110,6 +111,7 @@ extern "C" {
     fn lean_use_callback(a: *mut LeanClosure) -> u8;
     fn lean_use_io_callback(a: *mut LeanIOClosure) -> *mut LeanObject;
     fn lean_use_io_string_callback(a: *mut LeanIOStringClosure) -> *mut LeanObject;
+    fn lean_use_on_event(oe: *mut LeanOnEventClosure) -> *mut LeanOKCtor;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -292,8 +294,6 @@ pub fn test_lean() {
         }
         lean_io_mark_end_initialization();
 
-        gui_api::register_interpreter();
-
         let a = leans_answer(LEAN_UNIT);
         println!("Lean's answer: {}", a);
         // let b = leans_other_answer(12);
@@ -316,5 +316,14 @@ pub fn test_lean() {
             (*(*r3).m_objs_0).m_header.m_rc
         );
         lean_dec_ref(r3 as *mut LeanObject);
+
+        let mut interp = gui_api::Interpreter {
+            cur_event: gui_api::Event::Init,
+            effects: HashMap::new(),
+            committed: true,
+        };
+        gui_api::register_interpreter();
+        let cls = gui_api::mk_on_event_closure(&mut interp);
+        lean_use_on_event(cls);
     }
 }
