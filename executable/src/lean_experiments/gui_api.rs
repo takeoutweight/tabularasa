@@ -84,15 +84,15 @@ extern "C" fn on_event(
     _io: *mut lean_experiments::LeanObject,
 ) -> *mut lean_experiments::LeanOKCtor {
     let e: Event = Event::try_from(evt >> 1).unwrap();
-    print!("Rust: on_event called with: {:?}", e);
+    println!("Rust: on_event called with: {:?}", e);
     let o = interp as *mut lean_experiments::LeanExternalObject;
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
-        print!("Found Interpreter: {:?}", (*interp));
+        println!("Found Interpreter: {:?}", (*interp));
     }
     //    interp.cur_event = e;
     let r = lean_experiments::lean_io_result_mk_ok(0);
-    print!("Made ret value");
+    println!("Made ret value");
     r
 }
 
@@ -111,7 +111,7 @@ pub fn mk_on_event_closure(interp: &mut Interpreter) -> *mut lean_experiments::L
         (*m).m_header.m_other = 0;
         (*m).m_header.m_cs_sz = 0;
         (*m).m_fun = on_event;
-        (*m).m_arity = 2;
+        (*m).m_arity = 3;
         (*m).m_num_fixed = 1;
         (*m).m_arg = mk_event_external(interp);
         m

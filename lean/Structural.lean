@@ -47,6 +47,6 @@ inductive Event where
 @[export lean_use_on_event]
 def leanUseOnEvent(on_event : Event -> IO Uint8) : IO Unit := do
   IO.println "ok, starting"
+  _ <- on_event Event.up
   _ <- on_event Event.down
-  -- on_event Event.up
   IO.println "ok, done"
