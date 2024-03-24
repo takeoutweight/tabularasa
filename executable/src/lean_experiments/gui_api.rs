@@ -83,15 +83,17 @@ extern "C" fn on_event(
     evt: u8,
     _io: *mut lean_experiments::LeanObject,
 ) -> *mut lean_experiments::LeanOKCtor {
-    //let e: Event = Event::try_from(evt).unwrap();
-    print!("Rust: on_event called with {:?}", evt);
+    let e: Event = Event::try_from(evt >> 1).unwrap();
+    print!("Rust: on_event called with: {:?}", e);
     let o = interp as *mut lean_experiments::LeanExternalObject;
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
         print!("Found Interpreter: {:?}", (*interp));
     }
     //    interp.cur_event = e;
-    lean_experiments::lean_io_result_mk_ok(0)
+    let r = lean_experiments::lean_io_result_mk_ok(0);
+    print!("Made ret value");
+    r
 }
 
 // todo Result. Also lean will GC these wrappers after use I think, so might have to fuss with lifetimes
@@ -102,7 +104,7 @@ fn mk_event_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExt
 
 pub fn mk_on_event_closure(interp: &mut Interpreter) -> *mut lean_experiments::LeanOnEventClosure {
     unsafe {
-        let m = lean_experiments::lean_alloc_small(24, (24 / 8) - 1)
+        let m = lean_experiments::lean_alloc_small(32, (32 / 8) - 1)
             as *mut lean_experiments::LeanOnEventClosure;
         (*m).m_header.m_rc = 1;
         (*m).m_header.m_tag = 245; // LeanClosure

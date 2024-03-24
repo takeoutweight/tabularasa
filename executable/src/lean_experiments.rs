@@ -4,7 +4,7 @@ use std::{collections::HashMap, ffi, mem, ptr, slice, str};
 mod gui_api;
 
 #[repr(C)]
-struct LeanObject {
+pub struct LeanObject {
     m_rc: libc::c_int,
     m_cs_sz: libc::c_ushort,
     m_other: libc::c_uchar,
@@ -111,7 +111,7 @@ extern "C" {
     fn lean_use_callback(a: *mut LeanClosure) -> u8;
     fn lean_use_io_callback(a: *mut LeanIOClosure) -> *mut LeanObject;
     fn lean_use_io_string_callback(a: *mut LeanIOStringClosure) -> *mut LeanObject;
-    fn lean_use_on_event(oe: *mut LeanOnEventClosure) -> *mut LeanOKCtor;
+    fn lean_use_on_event(idk: libc::uintptr_t, oe: *mut LeanOnEventClosure, io: libc::uintptr_t) -> *mut LeanOKCtor;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -280,6 +280,7 @@ pub fn test_lean() {
         "size of LEANExternal {}",
         mem::size_of::<LeanExternalObject>()
     );
+    println!("size of LEANOnEventClosure {}", mem::size_of::<LeanOnEventClosure>());
 
     unsafe {
         lean_initialize_runtime_module();
@@ -324,6 +325,6 @@ pub fn test_lean() {
         };
         gui_api::register_interpreter();
         let cls = gui_api::mk_on_event_closure(&mut interp);
-        lean_use_on_event(cls);
+        lean_use_on_event(LEAN_UNIT, cls, LEAN_UNIT);
     }
 }
