@@ -89,6 +89,7 @@ extern "C" fn on_event(
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
         println!("Found Interpreter: {:?}", (*interp));
+        (*interp).committed = !(*interp).committed;
     }
     //    interp.cur_event = e;
     let r = lean_experiments::lean_io_result_mk_ok(0);
