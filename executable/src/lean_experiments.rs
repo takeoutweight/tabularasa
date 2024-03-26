@@ -123,6 +123,7 @@ extern "C" {
     fn lean_use_on_event(
         idk: libc::uintptr_t,
         oe: *mut Closure<gui_api::EventCallback>,
+        ce: *mut Closure<gui_api::ClearEffects>,
         io: libc::uintptr_t,
     ) -> *mut LeanOKCtor;
 }
@@ -360,6 +361,7 @@ pub fn test_lean() {
             committed: true,
         };
         let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
-        lean_use_on_event(LEAN_UNIT, cls, LEAN_UNIT);
+        let ce = gui_api::mk_clear_effects(&mut interp);
+        lean_use_on_event(LEAN_UNIT, cls, ce, LEAN_UNIT);
     }
 }

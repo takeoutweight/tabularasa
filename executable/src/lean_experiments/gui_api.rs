@@ -110,3 +110,28 @@ pub extern "C" fn on_event(
 pub fn mk_on_event(interp: &mut Interpreter) -> *mut Closure<EventCallback>{
     lean_experiments::mk_closure_2(on_event, mk_event_external(interp), 3)
 }
+
+pub type ClearEffects = extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor;
+
+pub extern "C" fn clear_effects(
+    interp: *mut LeanObject,
+    evt: u8,
+    _io: *mut LeanObject,
+) -> *mut lean_experiments::LeanOKCtor {
+    let e: Event = Event::try_from(evt >> 1).unwrap();
+    println!("Rust: clear_effects called with: {:?}", e);
+    let o = interp as *mut lean_experiments::LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        println!("Found Interpreter: {:?}", (*interp));
+        (*interp).committed = !(*interp).committed;
+    }
+    //    interp.cur_event = e;
+    let r = lean_experiments::lean_io_result_mk_ok(0);
+    println!("Made ret value");
+    r
+}
+
+pub fn mk_clear_effects(interp: &mut Interpreter) -> *mut Closure<EventCallback>{
+    lean_experiments::mk_closure_2(clear_effects, mk_event_external(interp), 3)
+}
