@@ -83,6 +83,15 @@ pub struct LeanOnEventClosure {
     m_arg: *mut LeanExternalObject,
 }
 
+#[repr(C)]
+pub struct Closure<T> {
+    m_header: LeanObject,
+    m_fun: T,
+    m_arity: u16,
+    m_num_fixed: u16,
+    m_arg: *mut LeanExternalObject,
+}
+
 const LEAN_UNIT: libc::uintptr_t = (0 << 1) | 1;
 
 #[link(name = "leanshared")]
@@ -102,6 +111,8 @@ extern "C" {
     ) -> *mut LeanExternalClass;
 }
 
+pub type EventCallback = extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor;
+
 // #[link(name = "Structural-1")]
 #[link(name = "Structural")]
 extern "C" {
@@ -111,7 +122,11 @@ extern "C" {
     fn lean_use_callback(a: *mut LeanClosure) -> u8;
     fn lean_use_io_callback(a: *mut LeanIOClosure) -> *mut LeanObject;
     fn lean_use_io_string_callback(a: *mut LeanIOStringClosure) -> *mut LeanObject;
-    fn lean_use_on_event(idk: libc::uintptr_t, oe: *mut LeanOnEventClosure, io: libc::uintptr_t) -> *mut LeanOKCtor;
+    fn lean_use_on_event(
+        idk: libc::uintptr_t,
+        oe: *mut Closure<EventCallback>,
+        io: libc::uintptr_t,
+    ) -> *mut LeanOKCtor;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -267,6 +282,26 @@ fn mk_external_object(
     }
 }
 
+// Arity includes the closed over object, which must be the first arg to the callback
+fn mk_closure_2<T>(
+    callback: T,
+    closed_obj: *mut LeanExternalObject,
+    arity: u16,
+) -> *mut Closure<T> {
+    unsafe {
+        let m = lean_alloc_small(32, (32 / 8) - 1) as *mut Closure<T>;
+        (*m).m_header.m_rc = 1;
+        (*m).m_header.m_tag = 245; // LeanClosure
+        (*m).m_header.m_other = 0;
+        (*m).m_header.m_cs_sz = 0;
+        (*m).m_fun = callback;
+        (*m).m_arity = arity;
+        (*m).m_num_fixed = 1;
+        (*m).m_arg = closed_obj;
+        m
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
     lean_io_result_mk_ok(90)
@@ -280,7 +315,10 @@ pub fn test_lean() {
         "size of LEANExternal {}",
         mem::size_of::<LeanExternalObject>()
     );
-    println!("size of LEANOnEventClosure {}", mem::size_of::<LeanOnEventClosure>());
+    println!(
+        "size of LEANOnEventClosure {}",
+        mem::size_of::<LeanOnEventClosure>()
+    );
 
     unsafe {
         lean_initialize_runtime_module();
@@ -324,7 +362,12 @@ pub fn test_lean() {
             committed: true,
         };
         gui_api::register_interpreter();
-        let cls = gui_api::mk_on_event_closure(&mut interp);
+        //let cls = gui_api::mk_on_event_closure(&mut interp);
+        let cls: *mut Closure<EventCallback> = mk_closure_2(
+            gui_api::on_event,
+            gui_api::mk_event_external(&mut interp),
+            3,
+        );
         lean_use_on_event(LEAN_UNIT, cls, LEAN_UNIT);
     }
 }

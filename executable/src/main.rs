@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use swash::scale::image::Content;
 
 mod lean_experiments;
+mod lean_experiments::gui_api;
 mod shader;
 
 #[repr(C)]

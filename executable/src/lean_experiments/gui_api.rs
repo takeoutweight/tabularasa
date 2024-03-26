@@ -1,4 +1,5 @@
 use crate::lean_experiments;
+use crate::lean_experiments::LeanObject;
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
@@ -61,7 +62,7 @@ extern "C" fn finalize(_this: *mut libc::c_void) {
     println!("finalize called");
 }
 
-extern "C" fn for_each(_this: *mut libc::c_void, _obj: *mut lean_experiments::LeanObject) {
+extern "C" fn for_each(_this: *mut libc::c_void, _obj: *mut LeanObject) {
     println!("for_each called");
 }
 
@@ -78,10 +79,10 @@ pub fn register_interpreter() {
     }
 }
 
-extern "C" fn on_event(
-    interp: *mut lean_experiments::LeanObject,
+pub extern "C" fn on_event(
+    interp: *mut LeanObject,
     evt: u8,
-    _io: *mut lean_experiments::LeanObject,
+    _io: *mut LeanObject,
 ) -> *mut lean_experiments::LeanOKCtor {
     let e: Event = Event::try_from(evt >> 1).unwrap();
     println!("Rust: on_event called with: {:?}", e);
@@ -98,7 +99,7 @@ extern "C" fn on_event(
 }
 
 // todo Result. Also lean will GC these wrappers after use I think, so might have to fuss with lifetimes
-fn mk_event_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExternalObject {
+pub fn mk_event_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExternalObject {
     let cls = INTERPRETER_CLASS.load().unwrap().0 as *mut lean_experiments::LeanExternalClass;
     lean_experiments::mk_external_object(cls, interp as *mut _ as *mut libc::c_void)
 }
