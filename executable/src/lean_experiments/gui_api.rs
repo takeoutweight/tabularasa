@@ -1,5 +1,5 @@
 use crate::lean_experiments;
-use crate::lean_experiments::LeanObject;
+use crate::lean_experiments::{Closure, LeanOKCtor, LeanObject};
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
@@ -79,6 +79,15 @@ pub fn register_interpreter() {
     }
 }
 
+// todo Result. Also lean will GC these wrappers after use I think, so might have to fuss with lifetimes
+pub fn mk_event_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExternalObject {
+    register_interpreter();
+    let cls = INTERPRETER_CLASS.load().unwrap().0 as *mut lean_experiments::LeanExternalClass;
+    lean_experiments::mk_external_object(cls, interp as *mut _ as *mut libc::c_void)
+}
+
+pub type EventCallback = extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor;
+
 pub extern "C" fn on_event(
     interp: *mut LeanObject,
     evt: u8,
@@ -98,24 +107,6 @@ pub extern "C" fn on_event(
     r
 }
 
-// todo Result. Also lean will GC these wrappers after use I think, so might have to fuss with lifetimes
-pub fn mk_event_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExternalObject {
-    let cls = INTERPRETER_CLASS.load().unwrap().0 as *mut lean_experiments::LeanExternalClass;
-    lean_experiments::mk_external_object(cls, interp as *mut _ as *mut libc::c_void)
-}
-
-pub fn mk_on_event_closure(interp: &mut Interpreter) -> *mut lean_experiments::LeanOnEventClosure {
-    unsafe {
-        let m = lean_experiments::lean_alloc_small(32, (32 / 8) - 1)
-            as *mut lean_experiments::LeanOnEventClosure;
-        (*m).m_header.m_rc = 1;
-        (*m).m_header.m_tag = 245; // LeanClosure
-        (*m).m_header.m_other = 0;
-        (*m).m_header.m_cs_sz = 0;
-        (*m).m_fun = on_event;
-        (*m).m_arity = 3;
-        (*m).m_num_fixed = 1;
-        (*m).m_arg = mk_event_external(interp);
-        m
-    }
+pub fn mk_on_event(interp: &mut Interpreter) -> *mut Closure<EventCallback>{
+    lean_experiments::mk_closure_2(on_event, mk_event_external(interp), 3)
 }

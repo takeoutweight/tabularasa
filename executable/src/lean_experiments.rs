@@ -111,8 +111,6 @@ extern "C" {
     ) -> *mut LeanExternalClass;
 }
 
-pub type EventCallback = extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor;
-
 // #[link(name = "Structural-1")]
 #[link(name = "Structural")]
 extern "C" {
@@ -124,7 +122,7 @@ extern "C" {
     fn lean_use_io_string_callback(a: *mut LeanIOStringClosure) -> *mut LeanObject;
     fn lean_use_on_event(
         idk: libc::uintptr_t,
-        oe: *mut Closure<EventCallback>,
+        oe: *mut Closure<gui_api::EventCallback>,
         io: libc::uintptr_t,
     ) -> *mut LeanOKCtor;
 }
@@ -361,13 +359,7 @@ pub fn test_lean() {
             effects: HashMap::new(),
             committed: true,
         };
-        gui_api::register_interpreter();
-        //let cls = gui_api::mk_on_event_closure(&mut interp);
-        let cls: *mut Closure<EventCallback> = mk_closure_2(
-            gui_api::on_event,
-            gui_api::mk_event_external(&mut interp),
-            3,
-        );
+        let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
         lean_use_on_event(LEAN_UNIT, cls, LEAN_UNIT);
     }
 }
