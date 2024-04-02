@@ -35,6 +35,13 @@ pub struct LeanOKStringCtor {
 }
 
 #[repr(C)]
+pub struct LeanOKU64Ctor {
+    m_header: LeanObject,
+    m_objs_0: u64,
+    m_objs_1: libc::uintptr_t,
+}
+
+#[repr(C)]
 pub struct LeanClosure {
     m_header: LeanObject,
     m_fun: extern "C" fn(u8) -> u8,
@@ -123,7 +130,7 @@ extern "C" {
     fn lean_use_on_event(
         idk: libc::uintptr_t,
         oe: *mut Closure<gui_api::EventCallback>,
-        ce: *mut Closure<gui_api::ClearEffects>,
+        ce: *mut Closure<gui_api::EventCallback>,
         io: libc::uintptr_t,
     ) -> *mut LeanOKCtor;
 }
@@ -246,6 +253,19 @@ fn lean_io_result_mk_string_ok(string: &str) -> *mut LeanOKStringCtor {
     }
 }
 
+fn lean_io_result_mk_u64_ok(val: u64) -> *mut LeanOKU64Ctor {
+    unsafe {
+        let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanOKU64Ctor;
+        (*m).m_header.m_rc = 1;
+        (*m).m_header.m_tag = 0;
+        (*m).m_header.m_other = 2;
+        (*m).m_header.m_cs_sz = 0;
+        (*m).m_objs_0 = val;
+        (*m).m_objs_1 = LEAN_UNIT;
+        m
+    }
+}
+
 // copies the string to Lean's memory.
 fn mk_lean_string(string: &str) -> *mut LeanString {
     let cstring = ffi::CString::new(string.to_string()).unwrap();
@@ -308,6 +328,7 @@ pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
 
 pub fn test_lean() {
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
+    println!("size of LEANU64Ctor: {}", mem::size_of::<LeanOKU64Ctor>());
     println!("size of LEANClosure {}", mem::size_of::<LeanClosure>());
     println!("size of LEANString {}", mem::size_of::<LeanString>());
     println!(
@@ -356,12 +377,17 @@ pub fn test_lean() {
         lean_dec_ref(r3 as *mut LeanObject);
 
         let mut interp = gui_api::Interpreter {
-            cur_event: gui_api::Event::Init,
-            effects: HashMap::new(),
+            effects: gui_api::Effects { next_id: 0,
+                                        new_columns: vec![],
+                                        text: HashMap::new(),
+                                        clip: HashMap::new(),
+                                        animate: HashMap::new(),
+                                        app_state: lean_io_result_mk_ok(0) as *mut LeanObject,
+            should_quit: false,},
             committed: true,
         };
-        let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
-        let ce = gui_api::mk_clear_effects(&mut interp);
-        lean_use_on_event(LEAN_UNIT, cls, ce, LEAN_UNIT);
+        // let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
+        // let ce = gui_api::mk_clear_effects(&mut interp);
+        // lean_use_on_event(LEAN_UNIT, cls, ce, LEAN_UNIT);
     }
 }

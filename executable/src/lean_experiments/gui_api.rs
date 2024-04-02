@@ -1,5 +1,5 @@
 use crate::lean_experiments;
-use crate::lean_experiments::{Closure, LeanOKCtor, LeanObject};
+use crate::lean_experiments::{Closure, LeanExternalObject, LeanOKCtor, LeanObject};
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
@@ -7,20 +7,20 @@ use std::convert::TryFrom;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-struct Vec2 {
-    x: f32,
-    y: f32,
+pub struct Vec2 {
+    pub x: f32,
+    pub y: f32,
 }
 
 // Pull into shared types higher up?
 #[derive(Debug)]
-struct Clip {
-    pos: Vec2,
-    size: Vec2,
+pub struct Clip {
+    pub pos: Vec2,
+    pub size: Vec2,
 }
 
 #[derive(Debug)]
-enum AppendMode {
+pub enum AppendMode {
     Append,
     Replace,
 }
@@ -29,24 +29,25 @@ type ColID = u32;
 
 #[derive(Debug)]
 pub struct Effects {
-    next_id: u32,
-    text: HashMap<ColID, (AppendMode, Vec<String>)>,
-    clip: HashMap<ColID, Option<Clip>>,
-    animate: HashMap<ColID, (Vec2, f32)>,
-    should_quit: bool,
+    pub next_id: u32,
+    pub new_columns: Vec<(ColID, Vec2)>,
+    pub text: HashMap<ColID, (AppendMode, Vec<String>)>,
+    pub clip: HashMap<ColID, Option<Clip>>,
+    pub animate: HashMap<ColID, (Vec2, f32)>,
+    pub app_state: *mut LeanObject,
+    pub should_quit: bool,
 }
 
 #[derive(Debug)]
 pub struct Interpreter {
-    pub cur_event: Event,
-    pub effects: HashMap<Event, Effects>,
+    pub effects: Effects,
     pub committed: bool,
 }
 
 #[repr(u8)]
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
 pub enum Event {
-    Init,
+    ASAP,
     AlphaNumeric,
     Up,
     Down,
@@ -80,7 +81,7 @@ pub fn register_interpreter() {
 }
 
 // todo Result. Also lean will GC these wrappers after use I think, so might have to fuss with lifetimes
-pub fn mk_event_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExternalObject {
+pub fn mk_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExternalObject {
     register_interpreter();
     let cls = INTERPRETER_CLASS.load().unwrap().0 as *mut lean_experiments::LeanExternalClass;
     lean_experiments::mk_external_object(cls, interp as *mut _ as *mut libc::c_void)
@@ -107,31 +108,52 @@ pub extern "C" fn on_event(
     r
 }
 
-pub fn mk_on_event(interp: &mut Interpreter) -> *mut Closure<EventCallback>{
-    lean_experiments::mk_closure_2(on_event, mk_event_external(interp), 3)
+pub fn mk_on_event(interp: &mut Interpreter) -> *mut Closure<EventCallback> {
+    lean_experiments::mk_closure_2(on_event, mk_external(interp), 3)
 }
 
-pub type ClearEffects = extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor;
+pub type SetAppState =
+    extern "C" fn(*mut LeanObject, *mut LeanObject, *mut LeanObject) -> *mut LeanOKCtor;
 
-pub extern "C" fn clear_effects(
+pub extern "C" fn set_app_state(
     interp: *mut LeanObject,
-    evt: u8,
+    state: *mut LeanObject,
     _io: *mut LeanObject,
-) -> *mut lean_experiments::LeanOKCtor {
-    let e: Event = Event::try_from(evt >> 1).unwrap();
-    println!("Rust: clear_effects called with: {:?}", e);
-    let o = interp as *mut lean_experiments::LeanExternalObject;
+) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
-        println!("Found Interpreter: {:?}", (*interp));
-        (*interp).committed = !(*interp).committed;
+        (*interp).effects.app_state = state;
     }
-    //    interp.cur_event = e;
-    let r = lean_experiments::lean_io_result_mk_ok(0);
-    println!("Made ret value");
-    r
+    lean_experiments::lean_io_result_mk_ok(0)
 }
 
-pub fn mk_clear_effects(interp: &mut Interpreter) -> *mut Closure<EventCallback>{
-    lean_experiments::mk_closure_2(clear_effects, mk_event_external(interp), 3)
+pub fn mk_set_app_state(interp: &mut Interpreter) -> *mut Closure<SetAppState> {
+    lean_experiments::mk_closure_2(set_app_state, mk_external(interp), 3)
+}
+
+pub type FreshColumn =
+    extern "C" fn(*mut LeanObject, *mut LeanObject, *mut LeanObject) -> *mut LeanOKCtor;
+
+pub extern "C" fn fresh_column(
+    interp: *mut LeanObject,
+    pos_x: f32,
+    pos_y: f32,
+    _io: *mut LeanObject,
+) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        let id = (*interp).effects.next_id;
+        (*interp)
+            .effects
+            .new_columns
+            .push((id, Vec2 { x: pos_x, y: pos_y }));
+        (*interp).effects.next_id = id + 1;
+    }
+    lean_experiments::lean_io_result_mk_ok(0)
+}
+
+pub fn mk_fresh_column(interp: &mut Interpreter) -> *mut Closure<FreshColumn> {
+    lean_experiments::mk_closure_2(set_app_state, mk_external(interp), 4)
 }

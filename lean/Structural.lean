@@ -51,3 +51,11 @@ def leanUseOnEvent(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Ui
   _ <- clear_effects Event.down
   _ <- on_event Event.alpha_numeric
   IO.println "ok, done"
+
+@[export lean_on_event]
+def leanOnEvent(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Uint8) : IO Unit := do
+  IO.println "ok, done"
+
+@[export lean_on_init]
+def leanOnInit(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Uint8) : IO Unit := do
+  IO.println "ok, done"
