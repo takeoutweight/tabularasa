@@ -132,7 +132,9 @@ dependencies = [
 
 [[package]]
 name = "miniquad"
-version = "0.4.0-alpha.10"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e9c578ad261f84512751bfdd9919c762ecd6103d06051fbdaede35136e1988"
 dependencies = [
  "libc",
  "ndk-sys",
@@ -263,7 +265,9 @@ dependencies = [
 
 [[package]]
 name = "texture_packer"
-version = "0.25.0"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c482ad3cce686643fd76c82255947382fbf8aa859e9f09a653811ebb86dadcb9"
 dependencies = [
  "image",
 ]

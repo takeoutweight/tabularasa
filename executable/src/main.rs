@@ -532,7 +532,7 @@ impl Stage {
             ..PipelineParams::default()
         };
 
-        let pipeline = ctx.new_pipeline_with_params(
+        let pipeline = ctx.new_pipeline(
             &[BufferLayout::default()],
             &[
                 VertexAttribute::new("in_pos", VertexFormat::Float2),

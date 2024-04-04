@@ -7,12 +7,14 @@ authors = [
 publish = false
 
 [dependencies]
-miniquad = { path = "../../../rust/miniquad"}
+# miniquad = { path = "../../../rust/miniquad"}
 # miniquad = "0.4.0-alpha.10"
+miniquad = "0.4.0"
 swash = "0.1.8"
 cosmic-text = "0.10.0"
 fontdb = "0.15.0"
-texture_packer = { path = "../../../rust/texture_packer"} # "0.25.0"
+# texture_packer = { path = "../../../rust/texture_packer"} # "0.25.0"
+texture_packer = "0.27.0"
 libc = "0.2"
 
 [lib]
