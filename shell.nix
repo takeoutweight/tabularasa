@@ -3,6 +3,7 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
+    lean4
 		pkg-config
 		iconv
 		rustc
