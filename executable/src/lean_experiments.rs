@@ -377,13 +377,15 @@ pub fn test_lean() {
         lean_dec_ref(r3 as *mut LeanObject);
 
         let mut interp = gui_api::Interpreter {
-            effects: gui_api::Effects { next_id: 0,
-                                        new_columns: vec![],
-                                        text: HashMap::new(),
-                                        clip: HashMap::new(),
-                                        animate: HashMap::new(),
-                                        app_state: lean_io_result_mk_ok(0) as *mut LeanObject,
-            should_quit: false,},
+            effects: gui_api::Effects {
+                next_id: 0,
+                new_columns: vec![],
+                text: HashMap::new(),
+                clip: HashMap::new(),
+                animate: HashMap::new(),
+                app_state: lean_io_result_mk_ok(0) as *mut LeanObject,
+                should_quit: false,
+            },
             committed: true,
         };
         // let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);

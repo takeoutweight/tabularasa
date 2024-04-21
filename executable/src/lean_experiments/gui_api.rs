@@ -1,5 +1,5 @@
 use crate::lean_experiments;
-use crate::lean_experiments::{Closure, LeanExternalObject, LeanOKCtor, LeanObject};
+use crate::lean_experiments::{Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanObject};
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
@@ -25,11 +25,11 @@ pub enum AppendMode {
     Replace,
 }
 
-type ColID = u32;
+type ColID = u64;
 
 #[derive(Debug)]
 pub struct Effects {
-    pub next_id: u32,
+    pub next_id: u64,
     pub new_columns: Vec<(ColID, Vec2)>,
     pub text: HashMap<ColID, (AppendMode, Vec<String>)>,
     pub clip: HashMap<ColID, Option<Clip>>,
@@ -133,14 +133,14 @@ pub fn mk_set_app_state(interp: &mut Interpreter) -> *mut Closure<SetAppState> {
 }
 
 pub type FreshColumn =
-    extern "C" fn(*mut LeanObject, *mut LeanObject, *mut LeanObject) -> *mut LeanOKCtor;
+    extern "C" fn(*mut LeanObject, f32, f32, *mut LeanObject) -> *mut LeanOKU64Ctor;
 
 pub extern "C" fn fresh_column(
     interp: *mut LeanObject,
     pos_x: f32,
     pos_y: f32,
     _io: *mut LeanObject,
-) -> *mut LeanOKCtor {
+) -> *mut LeanOKU64Ctor {
     let o = interp as *mut LeanExternalObject;
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
@@ -150,10 +150,10 @@ pub extern "C" fn fresh_column(
             .new_columns
             .push((id, Vec2 { x: pos_x, y: pos_y }));
         (*interp).effects.next_id = id + 1;
+        lean_experiments::lean_io_result_mk_u64_ok(id)
     }
-    lean_experiments::lean_io_result_mk_ok(0)
 }
 
 pub fn mk_fresh_column(interp: &mut Interpreter) -> *mut Closure<FreshColumn> {
-    lean_experiments::mk_closure_2(set_app_state, mk_external(interp), 4)
+    lean_experiments::mk_closure_2(fresh_column, mk_external(interp), 4)
 }
