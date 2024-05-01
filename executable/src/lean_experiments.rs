@@ -12,12 +12,24 @@ pub struct LeanObject {
 }
 
 #[repr(C)]
-struct LeanString {
+pub struct LeanString {
     m_header: LeanObject,
     m_size: usize, // byte length including \0 terminator
     m_capacity: usize,
     m_length: usize, //utf8 length
     m_data: [u8; 0], // libc::c_char is i8
+}
+
+#[repr(C)]
+pub struct LeanBoxedFloat {
+    m_header: LeanObject,
+    m_obj: f64,
+}
+
+#[repr(C)]
+pub struct LeanBoxedU64 {
+    m_header: LeanObject,
+    m_obj: u64,
 }
 
 #[repr(C)]
@@ -37,7 +49,7 @@ pub struct LeanOKStringCtor {
 #[repr(C)]
 pub struct LeanOKU64Ctor {
     m_header: LeanObject,
-    m_objs_0: u64,
+    m_objs_0: *mut LeanBoxedU64,
     m_objs_1: libc::uintptr_t,
 }
 
@@ -284,12 +296,20 @@ fn lean_io_result_mk_string_ok(string: &str) -> *mut LeanOKStringCtor {
 
 fn lean_io_result_mk_u64_ok(val: u64) -> *mut LeanOKU64Ctor {
     unsafe {
+        let bv = lean_alloc_small(16, (16 / 8) - 1) as *mut LeanBoxedU64;
+        // I guess we set this to 2 because it's nested? We segfault otherwise.
+        (*bv).m_header.m_rc = 2;
+        (*bv).m_header.m_tag = 0;
+        (*bv).m_header.m_other = 1;
+        (*bv).m_header.m_cs_sz = 0;
+        (*bv).m_obj = val;
+
         let m = lean_alloc_small(24, (24 / 8) - 1) as *mut LeanOKU64Ctor;
         (*m).m_header.m_rc = 1;
         (*m).m_header.m_tag = 0;
         (*m).m_header.m_other = 2;
         (*m).m_header.m_cs_sz = 0;
-        (*m).m_objs_0 = val;
+        (*m).m_objs_0 = bv;
         (*m).m_objs_1 = LEAN_UNIT;
         m
     }
@@ -357,7 +377,8 @@ pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
 
 pub fn test_lean() {
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
-    println!("size of LEANU64Ctor: {}", mem::size_of::<LeanOKU64Ctor>());
+    println!("size of LeanBoxedU64 {}", mem::size_of::<LeanBoxedU64>());
+    println!("size of LeanOKU64Ctor: {}", mem::size_of::<LeanOKU64Ctor>());
     println!("size of LEANClosure {}", mem::size_of::<LeanClosure>());
     println!("size of LEANString {}", mem::size_of::<LeanString>());
     println!(

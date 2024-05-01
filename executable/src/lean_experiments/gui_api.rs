@@ -1,11 +1,13 @@
 use crate::lean_experiments;
 use crate::lean_experiments::{
-    Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanObject, LeanOpaqueCtor,
+    Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanObject, lean_dec_ref,
 };
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+
+use super::LeanBoxedFloat;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -134,27 +136,40 @@ pub fn mk_set_app_state(interp: &mut Interpreter) -> *mut Closure<SetAppState> {
     lean_experiments::mk_closure_2(set_app_state, mk_external(interp), 3)
 }
 
-pub type FreshColumn =
-    extern "C" fn(*mut LeanObject, f64, f64, *mut LeanObject) -> *mut LeanOKU64Ctor;
+pub type FreshColumn = extern "C" fn(
+    *mut LeanObject,
+    *mut LeanBoxedFloat,
+    *mut LeanBoxedFloat,
+    *mut LeanObject,
+) -> *mut LeanOKU64Ctor;
 
 pub extern "C" fn fresh_column(
     interp: *mut LeanObject,
-    pos_x: f64,
-    pos_y: f64,
+    pos_x: *mut LeanBoxedFloat,
+    pos_y: *mut LeanBoxedFloat,
     _io: *mut LeanObject,
 ) -> *mut LeanOKU64Ctor {
     let o = interp as *mut LeanExternalObject;
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
         let id = (*interp).effects.next_id;
+        let ub_pos_x = (*pos_x).m_obj as f32;
+        let ub_pos_y = (*pos_y).m_obj as f32;
+        lean_dec_ref(pos_x as *mut LeanObject);
+        lean_dec_ref(pos_y as *mut LeanObject);
         (*interp).effects.new_columns.push((
             id,
             Vec2 {
-                x: pos_x as f32,
-                y: pos_y as f32,
+                x: ub_pos_x,
+                y: ub_pos_y,
             },
         ));
         (*interp).effects.next_id = id + 1;
+        println!(
+            "Got to the fresh_column, {},{}",
+            ub_pos_x, ub_pos_y
+        );
+        println!("effects: {:?}", (*interp).effects);
         lean_experiments::lean_io_result_mk_u64_ok(id)
     }
 }

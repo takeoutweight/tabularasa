@@ -65,8 +65,9 @@ def leanOnEvent
     (freshColumn : Float -> Float -> IO UInt64)
     : IO Unit := do
   setAppState {text := state.text ++ "!"}
---  _ <- freshColumn 1.0 2.0 -- getting segfault here
-  IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state}"
+  let cid <- freshColumn 111.0 222.0
+  let cid2 <- freshColumn 333.0 444.0
+  IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state} id: {cid},{cid2}"
 
 -- maybe think of better name, like initial_state, to distinguish from the on init event
 @[export lean_on_init]
