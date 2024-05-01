@@ -1,5 +1,7 @@
 use crate::lean_experiments;
-use crate::lean_experiments::{Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanObject};
+use crate::lean_experiments::{
+    Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanObject, LeanOpaqueCtor,
+};
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
 use std::collections::HashMap;
@@ -47,7 +49,7 @@ pub struct Interpreter {
 #[repr(u8)]
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
 pub enum Event {
-    ASAP,
+    Init,
     AlphaNumeric,
     Up,
     Down,
@@ -133,22 +135,25 @@ pub fn mk_set_app_state(interp: &mut Interpreter) -> *mut Closure<SetAppState> {
 }
 
 pub type FreshColumn =
-    extern "C" fn(*mut LeanObject, f32, f32, *mut LeanObject) -> *mut LeanOKU64Ctor;
+    extern "C" fn(*mut LeanObject, f64, f64, *mut LeanObject) -> *mut LeanOKU64Ctor;
 
 pub extern "C" fn fresh_column(
     interp: *mut LeanObject,
-    pos_x: f32,
-    pos_y: f32,
+    pos_x: f64,
+    pos_y: f64,
     _io: *mut LeanObject,
 ) -> *mut LeanOKU64Ctor {
     let o = interp as *mut LeanExternalObject;
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
         let id = (*interp).effects.next_id;
-        (*interp)
-            .effects
-            .new_columns
-            .push((id, Vec2 { x: pos_x, y: pos_y }));
+        (*interp).effects.new_columns.push((
+            id,
+            Vec2 {
+                x: pos_x as f32,
+                y: pos_y as f32,
+            },
+        ));
         (*interp).effects.next_id = id + 1;
         lean_experiments::lean_io_result_mk_u64_ok(id)
     }

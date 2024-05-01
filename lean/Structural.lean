@@ -39,10 +39,15 @@ def leanUseIOStringCallback (a : String -> IO String) : IO String := do
 -- @[export leans_other_answer]
 -- def leansOtherAnswer : IO UInt8 := rustsAnswer
 inductive Event where
-  | init : Event
+  | init : Event -- called immediately after leanOnInit with the state provided from that
   | alpha_numeric : Event
   | up : Event
   | down : Event
+  deriving Repr
+
+structure State where
+  text : String
+  deriving Repr
 
 @[export lean_use_on_event]
 def leanUseOnEvent(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Uint8) : IO Unit := do
@@ -53,9 +58,17 @@ def leanUseOnEvent(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Ui
   IO.println "ok, done"
 
 @[export lean_on_event]
-def leanOnEvent(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Uint8) : IO Unit := do
-  IO.println "ok, done"
+def leanOnEvent
+    (event : Event)
+    (state : State)
+    (setAppState : State -> IO Unit)
+    (freshColumn : Float -> Float -> IO UInt64)
+    : IO Unit := do
+  setAppState {text := state.text ++ "!"}
+--  _ <- freshColumn 1.0 2.0 -- getting segfault here
+  IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state}"
 
+-- maybe think of better name, like initial_state, to distinguish from the on init event
 @[export lean_on_init]
-def leanOnInit(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Uint8) : IO Unit := do
-  IO.println "ok, done"
+def leanOnInit : IO State := do
+  return {text := "init"}

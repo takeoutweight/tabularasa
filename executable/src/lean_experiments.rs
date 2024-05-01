@@ -42,6 +42,13 @@ pub struct LeanOKU64Ctor {
 }
 
 #[repr(C)]
+pub struct LeanOpaqueCtor {
+    m_header: LeanObject,
+    m_objs_0: *mut LeanObject,
+    m_objs_1: libc::uintptr_t,
+}
+
+#[repr(C)]
 pub struct LeanClosure {
     m_header: LeanObject,
     m_fun: extern "C" fn(u8) -> u8,
@@ -109,6 +116,7 @@ extern "C" {
     fn lean_finalize_thread();
     fn lean_io_mark_end_initialization();
     fn lean_io_result_show_error(o: *mut LeanObject);
+    fn lean_inc_ref_cold(o: *mut LeanObject);
     fn lean_dec_ref_cold(o: *mut LeanObject);
     pub fn lean_alloc_small(sz: u8, slot_idx: u8) -> *mut libc::c_void;
     fn lean_alloc_object(sz: usize) -> *mut libc::c_void;
@@ -126,13 +134,24 @@ extern "C" {
     fn leans_other_answer(_: u8) -> u8;
     fn lean_use_callback(a: *mut LeanClosure) -> u8;
     fn lean_use_io_callback(a: *mut LeanIOClosure) -> *mut LeanObject;
-    fn lean_use_io_string_callback(a: *mut LeanIOStringClosure) -> *mut LeanObject;
+    fn lean_use_io_string_callback(
+        a: *mut LeanIOStringClosure,
+        io: libc::uintptr_t,
+    ) -> *mut LeanObject;
     fn lean_use_on_event(
         idk: libc::uintptr_t,
         oe: *mut Closure<gui_api::EventCallback>,
         ce: *mut Closure<gui_api::EventCallback>,
         io: libc::uintptr_t,
     ) -> *mut LeanOKCtor;
+    fn lean_on_event(
+        evt: u8,
+        st: *mut LeanObject,
+        sap: *mut Closure<gui_api::SetAppState>,
+        fc: *mut Closure<gui_api::FreshColumn>,
+        io: libc::uintptr_t,
+    ) -> *mut LeanOKCtor;
+    fn lean_on_init(io: libc::uintptr_t) -> *mut LeanOpaqueCtor;
 }
 
 fn lean_dec_ref(o: *mut LeanObject) {
@@ -141,6 +160,16 @@ fn lean_dec_ref(o: *mut LeanObject) {
             (*o).m_rc -= 1;
         } else if (*o).m_rc != 0 {
             lean_dec_ref_cold(o);
+        }
+    }
+}
+
+fn lean_inc_ref(o: *mut LeanObject) {
+    unsafe {
+        if (*o).m_rc > 0 {
+            (*o).m_rc += 1;
+        } else if (*o).m_rc != 0 {
+            lean_inc_ref_cold(o);
         }
     }
 }
@@ -367,7 +396,7 @@ pub fn test_lean() {
         lean_dec_ref(r2 as *mut LeanObject);
 
         let cbios = mk_io_string_closure();
-        let r3 = lean_use_io_string_callback(cbios) as *mut LeanOKStringCtor;
+        let r3 = lean_use_io_string_callback(cbios, LEAN_UNIT) as *mut LeanOKStringCtor;
         println!("Lean's io string: {}", str_from_lean((*r3).m_objs_0));
         println!(
             "Lean's refcounts: {}, {}",
@@ -376,6 +405,11 @@ pub fn test_lean() {
         );
         lean_dec_ref(r3 as *mut LeanObject);
 
+        let init_state_io = lean_on_init(LEAN_UNIT);
+        let init_state = (*init_state_io).m_objs_0;
+        lean_inc_ref(init_state);
+        lean_dec_ref(init_state_io as *mut LeanObject);
+
         let mut interp = gui_api::Interpreter {
             effects: gui_api::Effects {
                 next_id: 0,
@@ -383,11 +417,21 @@ pub fn test_lean() {
                 text: HashMap::new(),
                 clip: HashMap::new(),
                 animate: HashMap::new(),
-                app_state: lean_io_result_mk_ok(0) as *mut LeanObject,
+                app_state: init_state,
                 should_quit: false,
             },
             committed: true,
         };
+
+        let sap = gui_api::mk_set_app_state(&mut interp);
+        let fc = gui_api::mk_fresh_column(&mut interp);
+        lean_on_event(0, interp.effects.app_state, sap, fc, LEAN_UNIT);
+
+        // silently doesn't call if these aren't rebuilt. Swallowing some error?
+        let sap = gui_api::mk_set_app_state(&mut interp);
+        let fc = gui_api::mk_fresh_column(&mut interp);
+        lean_on_event(1, interp.effects.app_state, sap, fc, LEAN_UNIT);
+
         // let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
         // let ce = gui_api::mk_clear_effects(&mut interp);
         // lean_use_on_event(LEAN_UNIT, cls, ce, LEAN_UNIT);
