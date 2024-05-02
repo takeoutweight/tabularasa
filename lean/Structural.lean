@@ -63,10 +63,14 @@ def leanOnEvent
     (state : State)
     (setAppState : State -> IO Unit)
     (freshColumn : Float -> Float -> IO UInt64)
+    (pushLine : UInt64 -> String -> IO Unit)
     : IO Unit := do
   setAppState {text := state.text ++ "!"}
   let cid <- freshColumn 111.0 222.0
   let cid2 <- freshColumn 333.0 444.0
+  pushLine cid "Line1"
+  pushLine cid2 "Line2A"
+  pushLine cid2 "Line2B"
   IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state} id: {cid},{cid2}"
 
 -- maybe think of better name, like initial_state, to distinguish from the on init event

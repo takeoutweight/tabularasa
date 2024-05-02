@@ -159,8 +159,9 @@ extern "C" {
     fn lean_on_event(
         evt: u8,
         st: *mut LeanObject,
-        sap: *mut Closure<gui_api::SetAppState>,
-        fc: *mut Closure<gui_api::FreshColumn>,
+        set_app_state: *mut Closure<gui_api::SetAppState>,
+        fresh_column: *mut Closure<gui_api::FreshColumn>,
+        push_line: *mut Closure<gui_api::PushLine>,
         io: libc::uintptr_t,
     ) -> *mut LeanOKCtor;
     fn lean_on_init(io: libc::uintptr_t) -> *mut LeanOpaqueCtor;
@@ -230,7 +231,6 @@ fn mk_io_closure() -> *mut LeanIOClosure {
 fn str_from_lean(lstring: *mut LeanString) -> &'static str {
     let ptr = raw_field!(lstring, LeanString, m_data) as *const u8;
     unsafe {
-        println!("Size we're about to pull {}", (*lstring).m_size);
         let slice: &[u8] = slice::from_raw_parts(ptr, (*lstring).m_size);
         let cstr = ffi::CStr::from_bytes_with_nul_unchecked(slice);
         str::from_utf8_unchecked(cstr.to_bytes())
@@ -275,7 +275,6 @@ pub fn lean_io_result_mk_ok(res: u8) -> *mut LeanOKCtor {
         (*m).m_header.m_cs_sz = 0;
         (*m).m_objs_0 = (res << 1) | 1;
         (*m).m_objs_1 = LEAN_UNIT;
-        println!("got here in mk_ok");
         m
     }
 }
@@ -446,12 +445,14 @@ pub fn test_lean() {
 
         let sap = gui_api::mk_set_app_state(&mut interp);
         let fc = gui_api::mk_fresh_column(&mut interp);
-        lean_on_event(0, interp.effects.app_state, sap, fc, LEAN_UNIT);
+        let pl = gui_api::mk_push_line(&mut interp);
+        lean_on_event(0, interp.effects.app_state, sap, fc, pl, LEAN_UNIT);
 
-        // silently doesn't call if these aren't rebuilt. Swallowing some error?
+        // silently doesn't call if these aren't rebuilt. Swallowing some error after GC'd?
         let sap = gui_api::mk_set_app_state(&mut interp);
         let fc = gui_api::mk_fresh_column(&mut interp);
-        lean_on_event(1, interp.effects.app_state, sap, fc, LEAN_UNIT);
+        let pl = gui_api::mk_push_line(&mut interp);
+        lean_on_event(1, interp.effects.app_state, sap, fc, pl, LEAN_UNIT);
 
         // let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
         // let ce = gui_api::mk_clear_effects(&mut interp);

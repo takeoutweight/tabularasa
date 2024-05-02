@@ -1,6 +1,6 @@
 use crate::lean_experiments;
 use crate::lean_experiments::{
-    Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanObject, lean_dec_ref,
+    Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanBoxedU64, LeanString, LeanObject, lean_dec_ref, str_from_lean,
 };
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
@@ -176,4 +176,34 @@ pub extern "C" fn fresh_column(
 
 pub fn mk_fresh_column(interp: &mut Interpreter) -> *mut Closure<FreshColumn> {
     lean_experiments::mk_closure_2(fresh_column, mk_external(interp), 4)
+}
+
+pub type PushLine = extern "C" fn(
+    *mut LeanObject,
+    *mut LeanBoxedU64,
+    *mut LeanString,
+    *mut LeanObject,
+) -> *mut LeanOKCtor;
+
+pub extern "C" fn push_line(
+    interp: *mut LeanObject,
+    id: *mut LeanBoxedU64,
+    text: *mut LeanString,
+    _io: *mut LeanObject,
+) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        let ub_id = (*id).m_obj;
+        let entry = (*interp).effects.text.entry(ub_id).or_insert((AppendMode::Append, vec![]));
+        entry.1.push(str_from_lean(text).to_owned());
+        lean_dec_ref(id as *mut LeanObject);
+        lean_dec_ref(text as *mut LeanObject);
+        println!("push_line: {:?}", (*interp).effects);
+        lean_experiments::lean_io_result_mk_ok(0)
+    }
+}
+
+pub fn mk_push_line(interp: &mut Interpreter) -> *mut Closure<PushLine> {
+    lean_experiments::mk_closure_2(push_line, mk_external(interp), 4)
 }
