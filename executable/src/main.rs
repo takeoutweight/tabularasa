@@ -12,6 +12,7 @@ use texture_packer::TexturePackerConfig;
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use swash::scale::image::Content;
+use lean_experiments::gui_api::Interpreter;
 
 mod lean_experiments;
 mod shader;
@@ -713,8 +714,23 @@ fn draw_rect(arr: &mut [u8; 400 * 200 * 4], x: usize, y: usize, w: usize, h: usi
     }
 }
 
+fn perform_effects(stage: &mut Stage, interp: &Interpreter) {
+    for nc in interp.effects.new_columns.iter() {
+        let id = stage.insert_text(Vec2{x: nc.1.x, y: nc.1.y}, None,
+                                   &{if nc.0 % 2 == 0 {
+                                       vec![String::from("one")] }
+                                    else {
+                                        vec![String::from("one"), String::from("two")]}}
+        );
+        assert!(id == nc.0 as usize, "{},{}", id, nc.0);
+    }
+    for (id, (_app, lines)) in interp.effects.text.iter(){
+        stage.replace_text(*id as usize, lines);
+    }
+}
+
 fn main() {
-    lean_experiments::test_lean();
+    let interp = lean_experiments::test_lean();
 
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
@@ -757,6 +773,7 @@ fn main() {
                 col_id,
                 vec![String::from("________________🐧🐧🐧 New value!")].as_slice(),
             );
+            perform_effects(&mut stage, &interp);
             stage
         })
     });

@@ -1,7 +1,7 @@
 use memoffset::raw_field;
 use std::{collections::HashMap, ffi, mem, ptr, slice, str};
 
-mod gui_api;
+pub mod gui_api;
 
 #[repr(C)]
 pub struct LeanObject {
@@ -374,7 +374,7 @@ pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
     lean_io_result_mk_ok(90)
 }
 
-pub fn test_lean() {
+pub fn test_lean() -> gui_api::Interpreter{
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
     println!("size of LeanBoxedU64 {}", mem::size_of::<LeanBoxedU64>());
     println!("size of LeanOKU64Ctor: {}", mem::size_of::<LeanOKU64Ctor>());
@@ -398,7 +398,7 @@ pub fn test_lean() {
             println!("failed to load lean: {:?}", res);
             lean_io_result_show_error(res);
             lean_dec_ref(res);
-            return;
+            // return; // FIXME just while experimenting
         }
         lean_io_mark_end_initialization();
 
@@ -432,7 +432,7 @@ pub fn test_lean() {
 
         let mut interp = gui_api::Interpreter {
             effects: gui_api::Effects {
-                next_id: 0,
+                next_id: 2, // FIXME, just have to cols hardcoded already
                 new_columns: vec![],
                 text: HashMap::new(),
                 clip: HashMap::new(),
@@ -457,5 +457,6 @@ pub fn test_lean() {
         // let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
         // let ce = gui_api::mk_clear_effects(&mut interp);
         // lean_use_on_event(LEAN_UNIT, cls, ce, LEAN_UNIT);
+        interp
     }
 }

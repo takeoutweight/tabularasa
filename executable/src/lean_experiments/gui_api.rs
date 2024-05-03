@@ -4,7 +4,7 @@ use crate::lean_experiments::{
 };
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 
 use super::LeanBoxedFloat;
