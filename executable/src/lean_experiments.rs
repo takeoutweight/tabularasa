@@ -1,5 +1,5 @@
 use memoffset::raw_field;
-use std::{collections::HashMap, ffi, mem, ptr, slice, str};
+use std::{collections::{BTreeMap, HashMap}, ffi, mem, ptr, slice, str};
 
 pub mod gui_api;
 
@@ -433,7 +433,7 @@ pub fn test_lean() -> gui_api::Interpreter{
         let mut interp = gui_api::Interpreter {
             effects: gui_api::Effects {
                 next_id: 2, // FIXME, just have to cols hardcoded already
-                new_columns: vec![],
+                new_columns: BTreeMap::new(),
                 text: HashMap::new(),
                 clip: HashMap::new(),
                 animate: HashMap::new(),

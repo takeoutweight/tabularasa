@@ -34,7 +34,7 @@ type ColID = u64;
 #[derive(Debug)]
 pub struct Effects {
     pub next_id: u64,
-    pub new_columns: Vec<(ColID, Vec2)>,
+    pub new_columns: BTreeMap<ColID, Vec2>,
     pub text: HashMap<ColID, (AppendMode, Vec<String>)>,
     pub clip: HashMap<ColID, Option<Clip>>,
     pub animate: HashMap<ColID, (Vec2, f32)>,
@@ -157,13 +157,14 @@ pub extern "C" fn fresh_column(
         let ub_pos_y = (*pos_y).m_obj as f32;
         lean_dec_ref(pos_x as *mut LeanObject);
         lean_dec_ref(pos_y as *mut LeanObject);
-        (*interp).effects.new_columns.push((
+        let old = (*interp).effects.new_columns.insert(
             id,
             Vec2 {
                 x: ub_pos_x,
                 y: ub_pos_y,
             },
-        ));
+        );
+        assert!(old.is_none());
         (*interp).effects.next_id = id + 1;
         println!(
             "Got to the fresh_column, {},{}",

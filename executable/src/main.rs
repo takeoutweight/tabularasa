@@ -715,17 +715,18 @@ fn draw_rect(arr: &mut [u8; 400 * 200 * 4], x: usize, y: usize, w: usize, h: usi
 }
 
 fn perform_effects(stage: &mut Stage, interp: &Interpreter) {
-    for nc in interp.effects.new_columns.iter() {
-        let id = stage.insert_text(Vec2{x: nc.1.x, y: nc.1.y}, None,
-                                   &{if nc.0 % 2 == 0 {
-                                       vec![String::from("one")] }
-                                    else {
-                                        vec![String::from("one"), String::from("two")]}}
-        );
-        assert!(id == nc.0 as usize, "{},{}", id, nc.0);
+    for (id, pos) in interp.effects.new_columns.iter() {
+        let sid = match interp.effects.text.get(id) {
+            None => {stage.insert_text(Vec2{x: pos.x, y: pos.y}, None, &vec![])}
+            Some((_app, lines)) => {stage.insert_text(Vec2{x: pos.x, y: pos.y}, None, lines)}
+        };
+
+        assert!(sid == *id as usize, "{},{}", sid, id);
     }
-    for (id, (_app, lines)) in interp.effects.text.iter(){
-        stage.replace_text(*id as usize, lines);
+    for (id, (_app, _lines)) in interp.effects.text.iter(){
+        let nc = interp.effects.new_columns.get(id);
+        // can't support appending to pre-existing cols yet
+        assert!(nc.is_some());
     }
 }
 
