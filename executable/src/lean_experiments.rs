@@ -1,5 +1,8 @@
 use memoffset::raw_field;
-use std::{collections::{BTreeMap, HashMap}, ffi, mem, ptr, slice, str};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ffi, mem, ptr, slice, str,
+};
 
 pub mod gui_api;
 
@@ -375,7 +378,7 @@ pub extern "C" fn rusts_answer() -> *mut LeanOKCtor {
     lean_io_result_mk_ok(90)
 }
 
-pub fn test_lean() -> gui_api::Interpreter{
+pub fn test_lean() -> gui_api::Interpreter {
     println!("size of LEANOKCtor: {}", mem::size_of::<LeanOKCtor>());
     println!("size of LeanBoxedU64 {}", mem::size_of::<LeanBoxedU64>());
     println!("size of LeanOKU64Ctor: {}", mem::size_of::<LeanOKU64Ctor>());

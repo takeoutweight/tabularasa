@@ -1,6 +1,7 @@
 use crate::lean_experiments;
 use crate::lean_experiments::{
-    Closure, LeanExternalObject, LeanOKCtor, LeanOKU64Ctor, LeanBoxedU64, LeanString, LeanObject, lean_dec_ref, str_from_lean,
+    lean_dec_ref, str_from_lean, Closure, LeanBoxedU64, LeanExternalObject, LeanOKCtor,
+    LeanOKU64Ctor, LeanObject, LeanString,
 };
 use crossbeam::atomic::AtomicCell;
 use num_enum::TryFromPrimitive;
@@ -166,10 +167,7 @@ pub extern "C" fn fresh_column(
         );
         assert!(old.is_none());
         (*interp).effects.next_id = id + 1;
-        println!(
-            "Got to the fresh_column, {},{}",
-            ub_pos_x, ub_pos_y
-        );
+        println!("Got to the fresh_column, {},{}", ub_pos_x, ub_pos_y);
         println!("effects: {:?}", (*interp).effects);
         lean_experiments::lean_io_result_mk_u64_ok(id)
     }
@@ -196,7 +194,11 @@ pub extern "C" fn push_line(
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
         let ub_id = (*id).m_obj;
-        let entry = (*interp).effects.text.entry(ub_id).or_insert((AppendMode::Append, vec![]));
+        let entry = (*interp)
+            .effects
+            .text
+            .entry(ub_id)
+            .or_insert((AppendMode::Append, vec![]));
         entry.1.push(str_from_lean(text).to_owned());
         lean_dec_ref(id as *mut LeanObject);
         lean_dec_ref(text as *mut LeanObject);
@@ -209,11 +211,8 @@ pub fn mk_push_line(interp: &mut Interpreter) -> *mut Closure<PushLine> {
     lean_experiments::mk_closure_2(push_line, mk_external(interp), 4)
 }
 
-pub type ResetText = extern "C" fn(
-    *mut LeanObject,
-    *mut LeanBoxedU64,
-    *mut LeanObject,
-) -> *mut LeanOKCtor;
+pub type ResetText =
+    extern "C" fn(*mut LeanObject, *mut LeanBoxedU64, *mut LeanObject) -> *mut LeanOKCtor;
 
 pub extern "C" fn reset_text(
     interp: *mut LeanObject,
@@ -224,7 +223,10 @@ pub extern "C" fn reset_text(
     unsafe {
         let interp = (*o).m_data as *mut Interpreter;
         let ub_id = (*id).m_obj;
-        (*interp).effects.text.insert(ub_id, (AppendMode::Replace, vec![]));
+        (*interp)
+            .effects
+            .text
+            .insert(ub_id, (AppendMode::Replace, vec![]));
         lean_dec_ref(id as *mut LeanObject);
         println!("reset_text: {:?}", (*interp).effects);
         lean_experiments::lean_io_result_mk_ok(0)

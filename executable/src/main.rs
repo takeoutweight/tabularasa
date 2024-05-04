@@ -9,10 +9,10 @@ use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
+use lean_experiments::gui_api::Interpreter;
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use swash::scale::image::Content;
-use lean_experiments::gui_api::Interpreter;
 
 mod lean_experiments;
 mod shader;
@@ -717,13 +717,13 @@ fn draw_rect(arr: &mut [u8; 400 * 200 * 4], x: usize, y: usize, w: usize, h: usi
 fn perform_effects(stage: &mut Stage, interp: &Interpreter) {
     for (id, pos) in interp.effects.new_columns.iter() {
         let sid = match interp.effects.text.get(id) {
-            None => {stage.insert_text(Vec2{x: pos.x, y: pos.y}, None, &vec![])}
-            Some((_app, lines)) => {stage.insert_text(Vec2{x: pos.x, y: pos.y}, None, lines)}
+            None => stage.insert_text(Vec2 { x: pos.x, y: pos.y }, None, &vec![]),
+            Some((_app, lines)) => stage.insert_text(Vec2 { x: pos.x, y: pos.y }, None, lines),
         };
 
         assert!(sid == *id as usize, "{},{}", sid, id);
     }
-    for (id, (_app, _lines)) in interp.effects.text.iter(){
+    for (id, (_app, _lines)) in interp.effects.text.iter() {
         let nc = interp.effects.new_columns.get(id);
         // can't support appending to pre-existing cols yet
         assert!(nc.is_some());
