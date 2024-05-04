@@ -9,7 +9,7 @@ use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
-use lean_experiments::gui_api::Interpreter;
+use lean_experiments::gui_api::{Interpreter, AppendMode};
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use swash::scale::image::Content;
@@ -723,10 +723,16 @@ fn perform_effects(stage: &mut Stage, interp: &Interpreter) {
 
         assert!(sid == *id as usize, "{},{}", sid, id);
     }
-    for (id, (_app, _lines)) in interp.effects.text.iter() {
+    for (id, (app, lines)) in interp.effects.text.iter() {
         let nc = interp.effects.new_columns.get(id);
-        // can't support appending to pre-existing cols yet
-        assert!(nc.is_some());
+
+        // i.e. we're adjusting text on a column that wasn't introduced this event
+        if nc.is_none() {
+            // don't support appending pre-existing text yet
+            assert!(matches!(app, AppendMode::Replace));
+            // don't support changing length yet
+            stage.replace_text(*id as usize, lines);
+        }
     }
 }
 
