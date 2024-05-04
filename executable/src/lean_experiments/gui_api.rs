@@ -208,3 +208,29 @@ pub extern "C" fn push_line(
 pub fn mk_push_line(interp: &mut Interpreter) -> *mut Closure<PushLine> {
     lean_experiments::mk_closure_2(push_line, mk_external(interp), 4)
 }
+
+pub type ResetText = extern "C" fn(
+    *mut LeanObject,
+    *mut LeanBoxedU64,
+    *mut LeanObject,
+) -> *mut LeanOKCtor;
+
+pub extern "C" fn reset_text(
+    interp: *mut LeanObject,
+    id: *mut LeanBoxedU64,
+    _io: *mut LeanObject,
+) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        let ub_id = (*id).m_obj;
+        (*interp).effects.text.insert(ub_id, (AppendMode::Replace, vec![]));
+        lean_dec_ref(id as *mut LeanObject);
+        println!("reset_text: {:?}", (*interp).effects);
+        lean_experiments::lean_io_result_mk_ok(0)
+    }
+}
+
+pub fn mk_reset_text(interp: &mut Interpreter) -> *mut Closure<ResetText> {
+    lean_experiments::mk_closure_2(reset_text, mk_external(interp), 3)
+}

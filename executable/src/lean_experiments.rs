@@ -162,6 +162,7 @@ extern "C" {
         set_app_state: *mut Closure<gui_api::SetAppState>,
         fresh_column: *mut Closure<gui_api::FreshColumn>,
         push_line: *mut Closure<gui_api::PushLine>,
+        reset_text: *mut Closure<gui_api::ResetText>,
         io: libc::uintptr_t,
     ) -> *mut LeanOKCtor;
     fn lean_on_init(io: libc::uintptr_t) -> *mut LeanOpaqueCtor;
@@ -446,13 +447,15 @@ pub fn test_lean() -> gui_api::Interpreter{
         let sap = gui_api::mk_set_app_state(&mut interp);
         let fc = gui_api::mk_fresh_column(&mut interp);
         let pl = gui_api::mk_push_line(&mut interp);
-        lean_on_event(0, interp.effects.app_state, sap, fc, pl, LEAN_UNIT);
+        let rt = gui_api::mk_reset_text(&mut interp);
+        lean_on_event(0, interp.effects.app_state, sap, fc, pl, rt, LEAN_UNIT);
 
         // silently doesn't call if these aren't rebuilt. Swallowing some error after GC'd?
         let sap = gui_api::mk_set_app_state(&mut interp);
         let fc = gui_api::mk_fresh_column(&mut interp);
         let pl = gui_api::mk_push_line(&mut interp);
-        lean_on_event(1, interp.effects.app_state, sap, fc, pl, LEAN_UNIT);
+        let rt = gui_api::mk_reset_text(&mut interp);
+        lean_on_event(1, interp.effects.app_state, sap, fc, pl, rt, LEAN_UNIT);
 
         // let cls: *mut Closure<gui_api::EventCallback> = gui_api::mk_on_event(&mut interp);
         // let ce = gui_api::mk_clear_effects(&mut interp);
