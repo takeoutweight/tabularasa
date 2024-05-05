@@ -40,7 +40,7 @@ def leanUseIOStringCallback (a : String -> IO String) : IO String := do
 -- def leansOtherAnswer : IO UInt8 := rustsAnswer
 inductive Event where
   | init : Event -- called immediately after leanOnInit with the state provided from that
-  | alpha_numeric : Event
+  | char : Event
   | up : Event
   | down : Event
   deriving Repr
@@ -54,13 +54,14 @@ def leanUseOnEvent(on_event : Event -> IO Uint8) (clear_effects : Event -> IO Ui
   IO.println "ok, starting"
   _ <- on_event Event.up
   _ <- clear_effects Event.down
-  _ <- on_event Event.alpha_numeric
+  _ <- on_event Event.char
   IO.println "ok, done"
 
 @[export lean_on_event]
 def leanOnEvent
     (event : Event)
     (state : State)
+    (char : UInt32)
     (setAppState : State -> IO Unit)
     (freshColumn : Float -> Float -> IO UInt64)
     (pushLine : UInt64 -> String -> IO Unit)

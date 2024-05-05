@@ -53,7 +53,7 @@ pub struct Interpreter {
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
 pub enum Event {
     Init,
-    AlphaNumeric,
+    Char,
     Up,
     Down,
 }
