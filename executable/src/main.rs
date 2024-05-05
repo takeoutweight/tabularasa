@@ -9,7 +9,7 @@ use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
-use lean_experiments::gui_api::{Interpreter, AppendMode};
+use lean_experiments::gui_api::{AppendMode, Interpreter};
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use swash::scale::image::Content;
@@ -427,53 +427,60 @@ impl Stage {
         self.text_data.unbound_laid_out_offset = self.text_data.laid_out_lines.len();
         self.text_data.unbound_laid_out_length = 0;
     }
+}
 
-    // not a str because the bufferline owns them. maybe better to copy inside somewhere?
-    pub fn insert_text(&mut self, pos: Vec2, clip: Option<Clip>, texts: &'_ [String]) -> usize {
-        let new_offset = self.text_data.laid_out_lines.len();
-        let mut new_size = 0;
+// not a str because the bufferline owns them. maybe better to copy inside somewhere?
+fn insert_text(
+    text_data: &mut TextData,
+    text_component: &mut TextComponent,
+    pos: Vec2,
+    clip: Option<Clip>,
+    texts: &'_ [String],
+) -> usize {
+    let new_offset = text_data.laid_out_lines.len();
+    let mut new_size = 0;
 
-        {
-            let mut cur_offset = new_offset;
-            self.text_data.columns.push(Column {
-                pos,
-                animation: None,
-                clip,
-                length: texts.len(),
-                offset: cur_offset,
-            });
-            cur_offset += texts.len();
-            new_size += texts.len();
-            self.text_data.laid_out_lines.extend(
-                texts
-                    .iter()
-                    .map(|text| layout(text, &mut self.text_component)),
-            );
-        }
-        let unbound_offset = self.text_data.unbound_laid_out_offset.min(new_offset);
-        self.text_data.unbound_laid_out_offset = unbound_offset;
-        self.text_data.unbound_laid_out_length = new_offset + new_size - unbound_offset;
-        let col_id = self.text_data.columns.len() - 1;
-        col_id
+    {
+        let mut cur_offset = new_offset;
+        text_data.columns.push(Column {
+            pos,
+            animation: None,
+            clip,
+            length: texts.len(),
+            offset: cur_offset,
+        });
+        cur_offset += texts.len();
+        new_size += texts.len();
+        text_data
+            .laid_out_lines
+            .extend(texts.iter().map(|text| layout(text, text_component)));
     }
+    let unbound_offset = text_data.unbound_laid_out_offset.min(new_offset);
+    text_data.unbound_laid_out_offset = unbound_offset;
+    text_data.unbound_laid_out_length = new_offset + new_size - unbound_offset;
+    let col_id = text_data.columns.len() - 1;
+    col_id
+}
 
-    pub fn replace_text(&mut self, col_id: usize, texts: &'_ [String]) {
-        let col = &self.text_data.columns[col_id];
-        assert!(col.length == texts.len());
-        self.text_data.laid_out_lines.splice(
-            col.offset..col.offset + col.length,
-            texts
-                .iter()
-                .map(|text| layout(text, &mut self.text_component)),
-        );
-        let unbound_offset = self.text_data.unbound_laid_out_offset.min(col.offset);
-        let unbound_length = max(
-            col.offset + col.length,
-            self.text_data.unbound_laid_out_offset + self.text_data.unbound_laid_out_length,
-        ) - unbound_offset;
-        self.text_data.unbound_laid_out_offset = unbound_offset;
-        self.text_data.unbound_laid_out_length = unbound_length;
-    }
+fn replace_text(
+    text_data: &mut TextData,
+    text_component: &mut TextComponent,
+    col_id: usize,
+    texts: &'_ [String],
+) {
+    let col = &text_data.columns[col_id];
+    assert!(col.length == texts.len());
+    text_data.laid_out_lines.splice(
+        col.offset..col.offset + col.length,
+        texts.iter().map(|text| layout(text, text_component)),
+    );
+    let unbound_offset = text_data.unbound_laid_out_offset.min(col.offset);
+    let unbound_length = max(
+        col.offset + col.length,
+        text_data.unbound_laid_out_offset + text_data.unbound_laid_out_length,
+    ) - unbound_offset;
+    text_data.unbound_laid_out_offset = unbound_offset;
+    text_data.unbound_laid_out_length = unbound_length;
 }
 
 struct Stage {
@@ -482,6 +489,7 @@ struct Stage {
     window_width: f32,
     window_height: f32,
     draws_remaining: i32,
+    interp: Interpreter,
     text_component: TextComponent,
     text_data: TextData,
 }
@@ -494,7 +502,7 @@ const TEXT_G: u8 = 0x10;
 const TEXT_B: u8 = 0x30;
 
 impl Stage {
-    pub fn new(window_width: f32, window_height: f32) -> Stage {
+    pub fn new(window_width: f32, window_height: f32, interp: Interpreter) -> Stage {
         let mut ctx: Box<dyn RenderingBackend> = window::new_rendering_backend();
 
         let shader = ctx
@@ -566,6 +574,7 @@ impl Stage {
             window_width,
             window_height,
             draws_remaining,
+            interp,
             text_component,
             text_data,
         }
@@ -671,6 +680,10 @@ impl EventHandler for Stage {
         self.window_height = h;
     }
 
+    fn char_event(&mut self, _character: char, _keymods: KeyMods, _repeat: bool) {
+        //perform_effects(self);
+    }
+
     fn key_down_event(&mut self, keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {
         match keycode {
             KeyCode::Up => {
@@ -714,24 +727,42 @@ fn draw_rect(arr: &mut [u8; 400 * 200 * 4], x: usize, y: usize, w: usize, h: usi
     }
 }
 
-fn perform_effects(stage: &mut Stage, interp: &Interpreter) {
-    for (id, pos) in interp.effects.new_columns.iter() {
-        let sid = match interp.effects.text.get(id) {
-            None => stage.insert_text(Vec2 { x: pos.x, y: pos.y }, None, &vec![]),
-            Some((_app, lines)) => stage.insert_text(Vec2 { x: pos.x, y: pos.y }, None, lines),
+fn perform_effects(stage: &mut Stage) {
+    //let interp = &mut stage.interp;
+    for (id, pos) in stage.interp.effects.new_columns.iter() {
+        let sid = match stage.interp.effects.text.get(id) {
+            None => insert_text(
+                &mut stage.text_data,
+                &mut stage.text_component,
+                Vec2 { x: pos.x, y: pos.y },
+                None,
+                &vec![],
+            ),
+            Some((_app, lines)) => insert_text(
+                &mut stage.text_data,
+                &mut stage.text_component,
+                Vec2 { x: pos.x, y: pos.y },
+                None,
+                lines,
+            ),
         };
 
         assert!(sid == *id as usize, "{},{}", sid, id);
     }
-    for (id, (app, lines)) in interp.effects.text.iter() {
-        let nc = interp.effects.new_columns.get(id);
+    for (id, (app, lines)) in stage.interp.effects.text.iter() {
+        let nc = stage.interp.effects.new_columns.get(id);
 
         // i.e. we're adjusting text on a column that wasn't introduced this event
         if nc.is_none() {
             // don't support appending pre-existing text yet
             assert!(matches!(app, AppendMode::Replace));
             // don't support changing length yet
-            stage.replace_text(*id as usize, lines);
+            replace_text(
+                &mut stage.text_data,
+                &mut stage.text_component,
+                *id as usize,
+                lines,
+            );
         }
     }
 }
@@ -753,8 +784,10 @@ fn main() {
     let window_height = conf.window_height as f32 * 2.0;
     miniquad::start(conf, move || {
         Box::new({
-            let mut stage = Stage::new(window_width, window_height);
-            stage.insert_text(
+            let mut stage = Stage::new(window_width, window_height, interp);
+            insert_text(
+                &mut stage.text_data,
+                &mut stage.text_component,
                 Vec2 { x: 100.0, y: 100.0 },
                 Some(Clip {
                     pos: Vec2 { x: 108.0, y: 100.0 },
@@ -771,16 +804,20 @@ fn main() {
                     String::from("A Eighth Line"),
                 ],
             );
-            let col_id = stage.insert_text(
+            let col_id = insert_text(
+                &mut stage.text_data,
+                &mut stage.text_component,
                 Vec2 { x: 200.0, y: 200.0 },
                 None,
                 &vec![String::from("Old value.")],
             );
-            stage.replace_text(
+            replace_text(
+                &mut stage.text_data,
+                &mut stage.text_component,
                 col_id,
                 vec![String::from("________________🐧🐧🐧 New value!")].as_slice(),
             );
-            perform_effects(&mut stage, &interp);
+            perform_effects(&mut stage);
             stage
         })
     });
