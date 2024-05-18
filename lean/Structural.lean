@@ -73,10 +73,11 @@ def leanOnEvent
   pushLine cid "Line1"
   pushLine cid2 "Line2A"
   pushLine cid2 "Line2B"
+  let the_char := Char.ofNat char.toNat
   let cid3 <- freshColumn 444.0 555.0
   pushLine cid3 "Line3A"
   resetText cid3
-  IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state} id: {cid},{cid2} char: {char}"
+  IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state} id: {cid},{cid2} char: {char}={the_char}"
 
 -- maybe think of better name, like initial_state, to distinguish from the on init event
 @[export lean_on_init]
