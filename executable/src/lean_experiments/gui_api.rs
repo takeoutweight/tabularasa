@@ -10,6 +10,20 @@ use std::convert::TryFrom;
 
 use super::LeanBoxedFloat;
 
+#[link(name = "Structural")]
+extern "C" {
+    fn lean_on_event(
+        evt: u8,
+        st: *mut LeanObject,
+        ch: u32,
+        set_app_state: *mut Closure<SetAppState>,
+        fresh_column: *mut Closure<FreshColumn>,
+        push_line: *mut Closure<PushLine>,
+        reset_text: *mut Closure<ResetText>,
+        io: libc::uintptr_t,
+    ) -> *mut LeanOKCtor;
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Vec2 {
@@ -58,6 +72,8 @@ pub enum Event {
     Down,
 }
 
+const LEAN_UNIT: libc::uintptr_t = (0 << 1) | 1;
+
 #[derive(Clone, PartialEq, std::cmp::Eq, std::marker::Copy)]
 struct ClassPointer(*const libc::c_void);
 unsafe impl Send for ClassPointer {}
@@ -90,6 +106,26 @@ pub fn mk_external(interp: &mut Interpreter) -> *mut lean_experiments::LeanExter
     register_interpreter();
     let cls = INTERPRETER_CLASS.load().unwrap().0 as *mut lean_experiments::LeanExternalClass;
     lean_experiments::mk_external_object(cls, interp as *mut _ as *mut libc::c_void)
+}
+
+pub fn send_event_to_lean(interp: &mut Interpreter, evt: u8, ch: u32) {
+    // silently doesn't call if these aren't rebuilt. Swallowing some error after GC'd?
+    let sap = mk_set_app_state(interp);
+    let fc = mk_fresh_column(interp);
+    let pl = mk_push_line(interp);
+    let rt = mk_reset_text(interp);
+    unsafe {
+        lean_on_event(
+            evt,
+            interp.effects.app_state,
+            ch,
+            sap,
+            fc,
+            pl,
+            rt,
+            LEAN_UNIT,
+        );
+    }
 }
 
 pub type EventCallback = extern "C" fn(*mut LeanObject, u8, *mut LeanObject) -> *mut LeanOKCtor;

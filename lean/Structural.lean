@@ -76,7 +76,7 @@ def leanOnEvent
   let cid3 <- freshColumn 444.0 555.0
   pushLine cid3 "Line3A"
   resetText cid3
-  IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state} id: {cid},{cid2}"
+  IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state} id: {cid},{cid2} char: {char}"
 
 -- maybe think of better name, like initial_state, to distinguish from the on init event
 @[export lean_on_init]

@@ -9,9 +9,9 @@ use texture_packer::rect::Rect;
 use texture_packer::TexturePackerConfig;
 // use texture_packer::importer::
 // use image_importer::ImageImporter;
-use lean_experiments::gui_api::{AppendMode, Interpreter};
+use lean_experiments::gui_api::{send_event_to_lean, AppendMode, Interpreter};
 use std::cmp::{max, min};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use swash::scale::image::Content;
 
 mod lean_experiments;
@@ -680,8 +680,9 @@ impl EventHandler for Stage {
         self.window_height = h;
     }
 
-    fn char_event(&mut self, _character: char, _keymods: KeyMods, _repeat: bool) {
-        //perform_effects(self);
+    fn char_event(&mut self, character: char, _keymods: KeyMods, _repeat: bool) {
+        send_event_to_lean(&mut self.interp, 1, character as u32);
+        perform_effects(self);
     }
 
     fn key_down_event(&mut self, keycode: KeyCode, _keymods: KeyMods, _repeat: bool) {
@@ -765,10 +766,16 @@ fn perform_effects(stage: &mut Stage) {
             );
         }
     }
+    stage.interp.effects.new_columns = BTreeMap::new();
+    stage.interp.effects.text = HashMap::new();
+    stage.interp.effects.clip = HashMap::new();
+    stage.interp.effects.animate = HashMap::new();
+    stage.interp.effects.should_quit = false;
 }
 
 fn main() {
-    let interp = lean_experiments::test_lean();
+    let mut interp = lean_experiments::test_lean();
+    send_event_to_lean(&mut interp, 1, 12);
 
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");
