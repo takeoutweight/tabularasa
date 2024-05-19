@@ -203,8 +203,8 @@ pub extern "C" fn fresh_column(
         );
         assert!(old.is_none());
         (*interp).effects.next_id = id + 1;
-        println!("Got to the fresh_column, {},{}", ub_pos_x, ub_pos_y);
-        println!("effects: {:?}", (*interp).effects);
+        // println!("Got to the fresh_column, {},{}", ub_pos_x, ub_pos_y);
+        // println!("effects: {:?}", (*interp).effects);
         lean_experiments::lean_io_result_mk_u64_ok(id)
     }
 }
@@ -238,7 +238,7 @@ pub extern "C" fn push_line(
         entry.1.push(str_from_lean(text).to_owned());
         lean_dec_ref(id as *mut LeanObject);
         lean_dec_ref(text as *mut LeanObject);
-        println!("push_line: {:?}", (*interp).effects);
+        // println!("push_line: {:?}", (*interp).effects);
         lean_experiments::lean_io_result_mk_ok(0)
     }
 }
@@ -264,11 +264,86 @@ pub extern "C" fn reset_text(
             .text
             .insert(ub_id, (AppendMode::Replace, vec![]));
         lean_dec_ref(id as *mut LeanObject);
-        println!("reset_text: {:?}", (*interp).effects);
+        // println!("reset_text: {:?}", (*interp).effects);
         lean_experiments::lean_io_result_mk_ok(0)
     }
 }
 
 pub fn mk_reset_text(interp: &mut Interpreter) -> *mut Closure<ResetText> {
     lean_experiments::mk_closure_2(reset_text, mk_external(interp), 3)
+}
+
+pub type SetClip = extern "C" fn(
+    *mut LeanObject,
+    *mut LeanBoxedU64,
+    *mut LeanBoxedFloat,
+    *mut LeanBoxedFloat,
+    *mut LeanBoxedFloat,
+    *mut LeanBoxedFloat,
+    *mut LeanObject,
+) -> *mut LeanOKCtor;
+
+pub extern "C" fn set_clip(
+    interp: *mut LeanObject,
+    id: *mut LeanBoxedU64,
+    pos_x: *mut LeanBoxedFloat,
+    pos_y: *mut LeanBoxedFloat,
+    width: *mut LeanBoxedFloat,
+    height: *mut LeanBoxedFloat,
+    _io: *mut LeanObject,
+) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        let ub_id = (*id).m_obj;
+        let ub_pos_x = (*pos_x).m_obj as f32;
+        let ub_pos_y = (*pos_y).m_obj as f32;
+        let ub_width = (*width).m_obj as f32;
+        let ub_height = (*height).m_obj as f32;
+        (*interp).effects.clip.insert(
+            ub_id,
+            Some(Clip {
+                pos: Vec2 {
+                    x: ub_pos_x,
+                    y: ub_pos_y,
+                },
+                size: Vec2 {
+                    x: ub_width,
+                    y: ub_height,
+                },
+            }),
+        );
+        lean_dec_ref(id as *mut LeanObject);
+        lean_dec_ref(pos_x as *mut LeanObject);
+        lean_dec_ref(pos_y as *mut LeanObject);
+        lean_dec_ref(width as *mut LeanObject);
+        lean_dec_ref(height as *mut LeanObject);
+        lean_experiments::lean_io_result_mk_ok(0)
+    }
+}
+
+pub fn mk_set_clip(interp: &mut Interpreter) -> *mut Closure<SetClip> {
+    lean_experiments::mk_closure_2(set_clip, mk_external(interp), 7)
+}
+
+pub type RemoveClip =
+    extern "C" fn(*mut LeanObject, *mut LeanBoxedU64, *mut LeanObject) -> *mut LeanOKCtor;
+
+pub extern "C" fn remove_clip(
+    interp: *mut LeanObject,
+    id: *mut LeanBoxedU64,
+    _io: *mut LeanObject,
+) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        let ub_id = (*id).m_obj;
+        (*interp).effects.clip.insert(ub_id, None);
+        lean_dec_ref(id as *mut LeanObject);
+        lean_experiments::lean_io_result_mk_ok(0)
+    }
+}
+
+pub fn mk_remove_clip(interp: &mut Interpreter) -> *mut Closure<RemoveClip> {
+    lean_experiments::mk_closure_2(remove_clip, mk_external(interp), 3)
 }

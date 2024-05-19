@@ -768,6 +768,23 @@ fn perform_effects(stage: &mut Stage) {
             );
         }
     }
+
+    for (id, clip) in stage.interp.effects.clip.iter() {
+        stage.text_data.columns[*id as usize].clip = match clip {
+            None => None,
+            Some(clip) => Some(Clip {
+                pos: Vec2 {
+                    x: clip.pos.x,
+                    y: clip.pos.y,
+                },
+                size: Vec2 {
+                    x: clip.size.x,
+                    y: clip.size.y,
+                },
+            }),
+        }
+    }
+
     stage.interp.effects.new_columns = BTreeMap::new();
     stage.interp.effects.text = HashMap::new();
     stage.interp.effects.clip = HashMap::new();
