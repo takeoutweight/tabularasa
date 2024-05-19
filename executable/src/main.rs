@@ -234,6 +234,8 @@ impl Stage {
         };
         let mut packer = SkylinePacker::new(config);
 
+        self.invalidate_atlas();
+
         for glyph in self.text_data.laid_out_lines.iter().flat_map(glyphs) {
             let glyph_key = CacheKey {
                 x_bin: SubpixelBin::Zero,
@@ -775,7 +777,6 @@ fn perform_effects(stage: &mut Stage) {
 
 fn main() {
     let mut interp = lean_experiments::test_lean();
-    send_event_to_lean(&mut interp, 1, 12);
 
     let mut conf = conf::Conf::default();
     let metal = std::env::args().nth(1).as_deref() == Some("metal");

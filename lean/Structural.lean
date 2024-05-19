@@ -67,15 +67,19 @@ def leanOnEvent
     (pushLine : UInt64 -> String -> IO Unit)
     (resetText : UInt64 -> IO Unit)
     : IO Unit := do
-  setAppState {text := state.text ++ "!"}
   let cid <- freshColumn 111.0 222.0
   let cid2 <- freshColumn 333.0 444.0
   pushLine cid "Line1"
   pushLine cid2 "Line2A"
   pushLine cid2 "Line2B"
   let the_char := Char.ofNat char.toNat
+  let next_text := match event with
+                   | Event.char => state.text.push the_char
+                   | _ => state.text
+  setAppState {text := next_text}
+  pushLine cid2 next_text
   let cid3 <- freshColumn 444.0 555.0
-  pushLine cid3 "Line3A"
+  pushLine cid3 "Wontseeme"
   resetText cid3
   IO.println s!"ok, called leanOnEvent. event: {repr event} with state: {repr state} id: {cid},{cid2} char: {char}={the_char}"
 
