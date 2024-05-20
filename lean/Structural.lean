@@ -66,6 +66,10 @@ def leanOnEvent
     (freshColumn : Float -> Float -> IO UInt64)
     (pushLine : UInt64 -> String -> IO Unit)
     (resetText : UInt64 -> IO Unit)
+    (setClip : UInt64 -> Float -> Float -> Float -> Float -> IO Unit)
+    (removeClip : UInt64 -> IO Unit)
+    (animate : UInt64 -> Float -> Float -> Float -> IO Unit)
+    (quit : IO Unit)
     : IO Unit := do
   let cid <- freshColumn 111.0 222.0
   let cid2 <- freshColumn 333.0 444.0

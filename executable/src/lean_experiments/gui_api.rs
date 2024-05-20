@@ -20,6 +20,10 @@ extern "C" {
         fresh_column: *mut Closure<FreshColumn>,
         push_line: *mut Closure<PushLine>,
         reset_text: *mut Closure<ResetText>,
+        set_clip: *mut Closure<SetClip>,
+        remove_clip: *mut Closure<RemoveClip>,
+        animate: *mut Closure<Animate>,
+        quit: *mut Closure<Quit>,
         io: libc::uintptr_t,
     ) -> *mut LeanOKCtor;
 }
@@ -114,6 +118,10 @@ pub fn send_event_to_lean(interp: &mut Interpreter, evt: u8, ch: u32) {
     let fc = mk_fresh_column(interp);
     let pl = mk_push_line(interp);
     let rt = mk_reset_text(interp);
+    let sc = mk_set_clip(interp);
+    let rc = mk_remove_clip(interp);
+    let an = mk_animate(interp);
+    let qt = mk_quit(interp);
     unsafe {
         lean_on_event(
             evt,
@@ -123,6 +131,10 @@ pub fn send_event_to_lean(interp: &mut Interpreter, evt: u8, ch: u32) {
             fc,
             pl,
             rt,
+            sc,
+            rc,
+            an,
+            qt,
             LEAN_UNIT,
         );
     }
