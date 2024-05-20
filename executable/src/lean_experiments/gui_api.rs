@@ -347,3 +347,64 @@ pub extern "C" fn remove_clip(
 pub fn mk_remove_clip(interp: &mut Interpreter) -> *mut Closure<RemoveClip> {
     lean_experiments::mk_closure_2(remove_clip, mk_external(interp), 3)
 }
+
+pub type Animate = extern "C" fn(
+    *mut LeanObject,
+    *mut LeanBoxedU64,
+    *mut LeanBoxedFloat,
+    *mut LeanBoxedFloat,
+    *mut LeanBoxedFloat,
+    *mut LeanObject,
+) -> *mut LeanOKCtor;
+
+pub extern "C" fn animate(
+    interp: *mut LeanObject,
+    id: *mut LeanBoxedU64,
+    pos_x: *mut LeanBoxedFloat,
+    pos_y: *mut LeanBoxedFloat,
+    duration: *mut LeanBoxedFloat,
+    _io: *mut LeanObject,
+) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        let ub_id = (*id).m_obj;
+        let ub_pos_x = (*pos_x).m_obj as f32;
+        let ub_pos_y = (*pos_y).m_obj as f32;
+        let ub_duration = (*duration).m_obj as f32;
+        (*interp).effects.animate.insert(
+            ub_id,
+            (
+                Vec2 {
+                    x: ub_pos_x,
+                    y: ub_pos_y,
+                },
+                ub_duration,
+            ),
+        );
+        lean_dec_ref(id as *mut LeanObject);
+        lean_dec_ref(pos_x as *mut LeanObject);
+        lean_dec_ref(pos_y as *mut LeanObject);
+        lean_dec_ref(duration as *mut LeanObject);
+        lean_experiments::lean_io_result_mk_ok(0)
+    }
+}
+
+pub fn mk_animate(interp: &mut Interpreter) -> *mut Closure<Animate> {
+    lean_experiments::mk_closure_2(animate, mk_external(interp), 6)
+}
+
+pub type Quit = extern "C" fn(*mut LeanObject, *mut LeanObject) -> *mut LeanOKCtor;
+
+pub extern "C" fn quit(interp: *mut LeanObject, _io: *mut LeanObject) -> *mut LeanOKCtor {
+    let o = interp as *mut LeanExternalObject;
+    unsafe {
+        let interp = (*o).m_data as *mut Interpreter;
+        (*interp).effects.should_quit = true;
+        lean_experiments::lean_io_result_mk_ok(0)
+    }
+}
+
+pub fn mk_quit(interp: &mut Interpreter) -> *mut Closure<Quit> {
+    lean_experiments::mk_closure_2(quit, mk_external(interp), 2)
+}

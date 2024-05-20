@@ -785,6 +785,21 @@ fn perform_effects(stage: &mut Stage) {
         }
     }
 
+    for (id, animate) in stage.interp.effects.animate.iter() {
+        let t = date::now();
+        stage.text_data.columns[*id as usize].animation = Some(Animating {
+            prev_pos: stage.text_data.columns[0].cur_pos(t),
+            duration: animate.1,
+            start_time: t,
+        });
+        stage.text_data.columns[*id as usize].pos.x = animate.0.x;
+        stage.text_data.columns[*id as usize].pos.y = animate.0.y;
+    }
+
+    if stage.interp.effects.should_quit {
+        window::quit();
+    }
+
     stage.interp.effects.new_columns = BTreeMap::new();
     stage.interp.effects.text = HashMap::new();
     stage.interp.effects.clip = HashMap::new();
