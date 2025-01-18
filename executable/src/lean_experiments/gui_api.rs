@@ -85,7 +85,7 @@ unsafe impl Send for ClassPointer {}
 static INTERPRETER_CLASS: AtomicCell<Option<ClassPointer>> = AtomicCell::new(None);
 
 extern "C" fn finalize(_this: *mut libc::c_void) {
-    println!("finalize called");
+//    println!("finalize called");
 }
 
 extern "C" fn for_each(_this: *mut libc::c_void, _obj: *mut LeanObject) {
