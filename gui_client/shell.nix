@@ -47,6 +47,7 @@ pkgs.mkShell rec {
   # We set SDKROOT and DEVELOPER_DIR to the Xcode ones instead of the nixpkgs ones,
   # because we need Swift 6.0 and nixpkgs doesn't have it.`
   # Xcode is required for development anyways
+  # (nds: I set it back to nixpkgs ones, I don't need Swift)
   shellHook =
     ''
       export LD_LIBRARY_PATH="${lib.makeLibraryPath buildInputs}:$LD_LIBRARY_PATH"

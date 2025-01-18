@@ -1,0 +1,13 @@
+[package]
+name = "gui_client"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nathan Sorenson <>"]
+description = "Tabula Rasa"
+license = "Apache-2.0"
+
+[dependencies.gpui]
+git = "https://github.com/zed-industries/zed.git"
+rev = "ac8220bb2e03a94e8c62022fa0efe9ff9adf1c1c"
+subdir = "crates/gpui"
+features = ["runtime_shaders"]
