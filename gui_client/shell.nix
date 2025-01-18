@@ -2,7 +2,7 @@
 # This is derived from zed's nix/shell.nix
 {
   pkgs ? import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/464fe85c27bd5761781a2773526ef9c1b0184dda.tar.gz")
-  { overlays = [(import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz"))
+  { overlays = [(import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/fc839c9d5d1ebc789b4657c43c4d54838c7c01de.tar.gz"))
                 (final: prev: {
                    rustToolchain = final.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
                 })]; },
