@@ -1,3 +1,4 @@
+.direnv
 /executable/target/
 /drawing/target/
 /lean/.lake
