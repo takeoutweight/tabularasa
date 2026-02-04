@@ -3,6 +3,7 @@
 #include <objc/message.h>
 #include <math.h>
 #include "mydelegate.h"
+#include "objc_helpers.h"
 
 /// --- HACKY STUFF TO TRY TO GET AWAY FROM silicon.h, some of this probably needs to be shared
 // external:
@@ -11,17 +12,7 @@ SEL sel_my_button_clicked = NULL;
 Class class_delegateclass = NULL;
 // lean external clas
 lean_external_class *mydelegate_class = NULL;
-SEL sel_alloc = NULL;
-SEL sel_init = NULL;
-SEL ns_release_code = NULL;
-#define my_objc_msgSend_id				((id (*)(id, SEL))objc_msgSend)
-#define objc_msgSend_void			((void (*)(id, SEL))objc_msgSend)
-void release(id obj) { objc_msgSend_void(obj, ns_release_code); }
-void register_hacky_obj_stuff() {
-  ns_release_code = sel_registerName("release");
-  sel_alloc = sel_registerName("alloc");
-  sel_init = sel_registerName("init");
-}
+
 // ------------------------------------------------
 
 lean_object* mk_delegate(lean_obj_arg lean_closed_over_value) {
@@ -66,7 +57,6 @@ void mydelegate_myButtonClicked(id self, SEL _cmd) {
 }
 
 void register_delegate_classes() {
-  register_hacky_obj_stuff();
   // just trying to rule some things out, i wonder if you can't call sel_registerName twice? (Docs suggest you can)
   printf("allocated codes %i, %i\n", sel_alloc, sel_init);
   Class class_nsobject = objc_getClass("NSObject");

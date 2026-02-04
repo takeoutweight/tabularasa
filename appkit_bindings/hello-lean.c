@@ -7,6 +7,7 @@
 #include <silicon.h>
 #include <lean/lean.h>
 #include "mydelegate.h"
+#include "objc_helpers.h"
 
 // Don't know why this isnt in lean.h?
 void lean_initialize_runtime_module();
@@ -23,6 +24,7 @@ bool windowShouldClose(id sender)  {
 }
 
 void register_external_classes() {
+  register_objc_helpers();
   register_delegate_classes();
 }
 
