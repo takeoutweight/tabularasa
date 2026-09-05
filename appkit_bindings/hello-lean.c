@@ -7,6 +7,7 @@
 #include <silicon.h>
 #include <lean/lean.h>
 #include "mydelegate.h"
+#include "lean_wrapped.h"
 #include "objc_helpers.h"
 
 // Don't know why this isnt in lean.h?
@@ -26,6 +27,7 @@ bool windowShouldClose(id sender)  {
 void register_external_classes() {
   register_objc_helpers();
   register_delegate_classes();
+  register_lean_wrapped_classes();
 }
 
 int main() {
@@ -73,6 +75,8 @@ int main() {
 	NSTextField_setEditable(label, false);
 	NSTextField_setSelectable(label, false);
 	NSTextField_setTextColor(label, NSColor_colorWithSRGB(0.0, 0.5, 0.0, 1.0));
+
+  lean_object *lean_label = mk_lean_wrapped(label);
 
 	NSFontManager* font_manager = NSFontManager_sharedFontManager();
 	NSFont* current_font = NSTextField_font(label);

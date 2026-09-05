@@ -16,6 +16,8 @@ lean_external_class *mydelegate_class = NULL;
 
 // ------------------------------------------------
 
+// a lean wrapped objective c delegate object, which, itself, holds a lean object in lean_closed_over_value.
+// pulled out via lean_get_external_data
 lean_object* mk_delegate(lean_obj_arg lean_closed_over_value) {
   printf("tryign to alloc %p\n", class_delegateclass);
   printf("is this different? %p\n", (id)class_delegateclass);
@@ -38,7 +40,7 @@ void mydelegate_m_finalize(void *m_data_delegate) {
 
   // I lean_dec_ref fails on boxed(47) so I guess that still counts as a scalar.
   lean_dec(val);
-  release((id)m_data_delegate);
+  NSRelease((id)m_data_delegate);
 }
 
 void none_m_foreach(void *m_data_delegate, b_lean_obj_arg fn) {
