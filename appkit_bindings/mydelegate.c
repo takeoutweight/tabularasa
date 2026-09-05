@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <objc/message.h>
 #include <math.h>
+#include <silicon.h>
 #include "mydelegate.h"
 #include "objc_helpers.h"
 

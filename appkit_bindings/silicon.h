@@ -36,11 +36,7 @@
 #include <objc/message.h>
 
 #define SILICON_H
-#ifdef SICDEF_STATIC
-#define SICDEF static /* I have this so I can get warnings for functions that aren't defined */
-#else
-#define SICDEF static inline
-#endif
+#define SICDEF extern
 
 
 #define NS_ENUM(type, name) type name; enum
